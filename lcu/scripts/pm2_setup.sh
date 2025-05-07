@@ -26,8 +26,7 @@ module.exports = {
   apps: [
     {
       name: 'ota-service',
-      script: '${VENV_PATH}',
-      args: 'ota/ota.py',
+      script: 'ota/ota.py',
       interpreter: '${VENV_PATH}',
       watch: false,
       autorestart: true,
@@ -48,8 +47,7 @@ module.exports = {
     },
     {
       name: 'firmware-service',
-      script: '${VENV_PATH}',
-      args: 'firmware/firmware.py',
+      script: 'firmware/firmware.py',
       interpreter: '${VENV_PATH}',
       watch: false,
       autorestart: true,
