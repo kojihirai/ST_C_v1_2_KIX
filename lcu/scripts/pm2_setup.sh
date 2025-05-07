@@ -73,7 +73,14 @@ pm2 save
 
 # Setup PM2 to start on system boot
 echo "Setting up PM2 startup script..."
-pm2 startup
+STARTUP_CMD=$(pm2 startup | grep -o "sudo.*")
+if [ ! -z "$STARTUP_CMD" ]; then
+    echo "Executing PM2 startup command..."
+    eval "$STARTUP_CMD"
+else
+    echo "Warning: Could not get PM2 startup command. You may need to run it manually."
+    echo "Run 'pm2 startup' and execute the command it provides."
+fi
 
 echo "PM2 setup complete! Your applications are now running and will start automatically on system boot."
 echo "To check status: pm2 status"
