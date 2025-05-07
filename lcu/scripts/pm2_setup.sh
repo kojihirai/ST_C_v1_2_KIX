@@ -34,12 +34,17 @@ module.exports = {
       max_restarts: 10,
       restart_delay: 5000,
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PYTHONUNBUFFERED: '1',
+        PYTHONPATH: '$(pwd)',
+        PATH: '$(pwd)/venv/bin:${PATH}'
       },
       error_file: 'logs/ota-error.log',
       out_file: 'logs/ota-out.log',
       log_file: 'logs/ota-combined.log',
-      time: true
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     },
     {
       name: 'firmware-service',
@@ -51,12 +56,17 @@ module.exports = {
       max_restarts: 10,
       restart_delay: 5000,
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PYTHONUNBUFFERED: '1',
+        PYTHONPATH: '$(pwd)',
+        PATH: '$(pwd)/venv/bin:${PATH}'
       },
       error_file: 'logs/firmware-error.log',
       out_file: 'logs/firmware-out.log',
       log_file: 'logs/firmware-combined.log',
-      time: true
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     }
   ]
 };
@@ -89,3 +99,4 @@ echo "PM2 setup complete! Your applications are now running and will start autom
 echo "To check status: pm2 status"
 echo "To view logs: pm2 logs"
 echo "To restart: pm2 restart all"
+echo "To check detailed logs: pm2 logs ota-service --lines 100"
