@@ -9,6 +9,14 @@ if ! command -v pm2 &> /dev/null; then
     npm install -g pm2
 fi
 
+# Stop and delete all PM2 processes
+echo "Stopping and deleting all PM2 processes..."
+pm2 delete all
+
+# Remove PM2 startup configuration
+echo "Removing PM2 startup configuration..."
+pm2 unstartup
+
 # Create PM2 ecosystem file
 cat > ecosystem.config.js << EOL
 module.exports = {
@@ -51,7 +59,9 @@ module.exports = {
 };
 EOL
 
-# Create logs directory if it doesn't exist
+# Clean up old logs
+echo "Cleaning up old logs..."
+rm -rf logs
 mkdir -p logs
 
 # Start the applications
