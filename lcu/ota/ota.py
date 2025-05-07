@@ -8,13 +8,11 @@ import glob
 
 app = Flask(__name__)
 
-# Configuration
 UPLOAD_FOLDER = '/home/pi/Desktop/lcu/firmware'
 ARCHIVE_FOLDER = os.path.join(UPLOAD_FOLDER, 'archive')
 MAX_ARCHIVE_VERSIONS = 3
 PM2_APP_NAME = 'firmware'
 
-# Ensure directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
 
@@ -65,14 +63,11 @@ def upload_file():
         return jsonify({'error': 'Only Python files are allowed'}), 400
 
     try:
-        # Archive current firmware
         archive_current_firmware()
         
-        # Save new firmware
         file_path = os.path.join(UPLOAD_FOLDER, 'firmware.py')
         file.save(file_path)
         
-        # Restart PM2 process
         subprocess.run(['pm2', 'restart', PM2_APP_NAME])
         
         return jsonify({'message': 'Firmware updated successfully'})
