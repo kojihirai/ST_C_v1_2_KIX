@@ -1,0 +1,9 @@
+paho-mqtt
+pigpio
+pymodbus
+flask
+psycopg2
+asyncpg
+pydantic
+fastapi
+uvicorn
