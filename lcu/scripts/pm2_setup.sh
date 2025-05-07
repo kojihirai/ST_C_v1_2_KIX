@@ -17,15 +17,18 @@ pm2 delete all
 echo "Removing PM2 startup configuration..."
 pm2 unstartup
 
+# Get the absolute path to the virtual environment
+VENV_PATH="$(pwd)/venv/bin/python3"
+
 # Create PM2 ecosystem file
 cat > ecosystem.config.js << EOL
 module.exports = {
   apps: [
     {
       name: 'ota-service',
-      script: 'python3',
+      script: '${VENV_PATH}',
       args: 'ota/ota.py',
-      interpreter: 'python3',
+      interpreter: '${VENV_PATH}',
       watch: false,
       autorestart: true,
       max_restarts: 10,
@@ -40,9 +43,9 @@ module.exports = {
     },
     {
       name: 'firmware-service',
-      script: 'python3',
+      script: '${VENV_PATH}',
       args: 'firmware/firmware.py',
-      interpreter: 'python3',
+      interpreter: '${VENV_PATH}',
       watch: false,
       autorestart: true,
       max_restarts: 10,
