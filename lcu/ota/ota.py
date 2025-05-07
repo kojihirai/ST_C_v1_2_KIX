@@ -8,10 +8,11 @@ import glob
 
 app = Flask(__name__)
 
-UPLOAD_FOLDER = '/home/pi/Desktop/lcu/firmware'
+# Update paths to be relative to the lcu directory
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'firmware')
 ARCHIVE_FOLDER = os.path.join(UPLOAD_FOLDER, 'archive')
 MAX_ARCHIVE_VERSIONS = 3
-PM2_APP_NAME = 'firmware'
+PM2_APP_NAME = 'firmware-service'  # Updated to match PM2 config
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
@@ -68,6 +69,7 @@ def upload_file():
         file_path = os.path.join(UPLOAD_FOLDER, 'firmware.py')
         file.save(file_path)
         
+        # Restart the firmware service using PM2
         subprocess.run(['pm2', 'restart', PM2_APP_NAME])
         
         return jsonify({'message': 'Firmware updated successfully'})
