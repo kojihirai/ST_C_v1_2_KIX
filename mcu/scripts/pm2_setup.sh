@@ -20,6 +20,13 @@ pm2 unstartup
 # Get the absolute path to the virtual environment
 VENV_PATH="$(pwd)/venv/bin/python3"
 
+# Build Next.js application
+echo "Building Next.js application..."
+cd hmi
+npm install
+npm run build
+cd ..
+
 # Create PM2 ecosystem file
 cat > ecosystem.config.js << EOL
 module.exports = {
@@ -62,6 +69,26 @@ module.exports = {
       error_file: 'logs/firmware-error.log',
       out_file: 'logs/firmware-out.log',
       log_file: 'logs/firmware-combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+    },
+    {
+      name: 'nextjs-app',
+      cwd: './hmi',
+      script: 'node_modules/next/dist/bin/next',
+      args: 'start',
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      restart_delay: 5000,
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3001
+      },
+      error_file: 'logs/nextjs-error.log',
+      out_file: 'logs/nextjs-out.log',
+      log_file: 'logs/nextjs-combined.log',
       time: true,
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'

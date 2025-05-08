@@ -135,9 +135,13 @@ class PIDController:
 # ----------------------------------------------------
 class Mode(Enum):
     IDLE = 0
-    RUN_CONTINUOUS = 1
-    PID_SPEED = 2
-    HOMING = 3
+    RUN_DURATION = 1
+    RUN_CONTINUOUS = 2
+    PID_POSITION = 3
+    PID_CURRENT = 4
+    PID_LOAD = 5
+    PID_SPEED = 6
+    HOMING = 7
 
 class Direction(Enum):
     IDLE = 0
