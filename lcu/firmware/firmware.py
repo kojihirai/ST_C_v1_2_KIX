@@ -245,6 +245,12 @@ class MotorSystem:
                     self.target = float(data['target'])
                 if 'pid_setpoint' in data:
                     self.pid_setpoint = float(data['pid_setpoint'])
+                if 'experiment_id' in data:
+                    self.experiment_id = int(data['experiment_id'])
+                if 'run_id' in data:
+                    self.run_id = int(data['run_id'])
+                if 'project_id' in data:
+                    self.project_id = int(data['project_id'])
             print(f"Received command: mode={self.mode}, direction={self.direction}, target={self.target}, setpoint={self.pid_setpoint}")
         except Exception as e:
             print(f"MQTT command error: {e}")
@@ -333,6 +339,10 @@ class MotorSystem:
             
             data = {
                 "timestamp": time.monotonic(),
+                "mode": self.mode,
+                "direction": self.direction,
+                "target": self.target,
+                "setpoint": self.pid_setpoint,
                 "pos_ticks": pos_ticks,
                 "pos_mm": round(pos_mm, 3),
                 "pos_inches": round(pos_in, 3),
@@ -340,7 +350,10 @@ class MotorSystem:
                 "load": load_value if load_value is not None else 0.0,
                 "hold": 1 if hold else 0,
                 "stable": 1 if stable else 0,
-                "current_speed": round(self.current_speed, 3)
+                "current_speed": round(self.current_speed, 3),
+                "experiment_id": self.experiment_id,
+                "run_id": self.run_id,
+                "project_id": self.project_id,
             }
             self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
