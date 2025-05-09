@@ -65,10 +65,15 @@ class HighSpeedLogger:
 class LoadCell:
     def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
         self.client = ModbusSerialClient(
-            port=port, baudrate=baudrate, parity=parity,
-            stopbits=stopbits, bytesize=bytesize, timeout=timeout
+            port=port,
+            baudrate=baudrate,
+            parity=parity,
+            stopbits=stopbits,
+            bytesize=bytesize,
+            timeout=timeout
         )
         self.slave_id = slave_id
+        self.connected = self.client.connect()
         try:
             self.connected = self.client.connect()
         except Exception as e:
@@ -203,7 +208,7 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-        self.load_cell = LoadCell('/dev/ttyUSB0', 9600, 'E', 1, 8, 1, 1)
+                self.load_cell = LoadCell(port='/dev/ttyUSB0', baudrate=9600, parity='E', stopbits=1, bytesize=8, timeout=1, slave_id=1)
         self.logger = HighSpeedLogger()
 
         self.running = True
