@@ -5,6 +5,7 @@ import apiClient, {
   getProjects,
   getProject as apiGetProject,
   createProject as apiCreateProject,
+  deleteProject as apiDeleteProject,
   getExperimentsByProject,
   getExperiment,
   createExperiment as apiCreateExperiment,
@@ -252,13 +253,22 @@ export async function duplicateProject(projectId: string): Promise<Project> {
   }
 }
 
+export async function deleteProject(projectId: number): Promise<void> {
+  try {
+    await apiDeleteProject(projectId);
+  } catch (error) {
+    console.error(`Error deleting project ${projectId}:`, error);
+    throw error;
+  }
+}
+
 // Create a default export with all data functions
 const dataFunctions = {
   createProject,
   getProjects: fetchProjects,
   getProject,
   updateProject,
-  deleteProject: deleteExperiment,
+  deleteProject,
   duplicateProject,
   createExperiment,
   getExperiments: fetchExperiments,

@@ -124,6 +124,10 @@ export const createProject = async (data: {
   return response.data;
 };
 
+export const deleteProject = async (projectId: number): Promise<void> => {
+  await axiosInstance.delete(`/projects/${projectId}`);
+};
+
 export const getProjects = async (): Promise<Project[]> => {
   try {
     const response = await axiosInstance.get('/projects');

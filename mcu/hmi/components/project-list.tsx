@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Trash, Copy } from "lucide-react"
-import { fetchProjects, duplicateProject, Project } from "@/lib/data"
+import { fetchProjects, duplicateProject, deleteProject, Project } from "@/lib/data"
 import { formatDate } from "@/lib/utils"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { useRouter } from "next/navigation"
@@ -48,8 +48,7 @@ export function ProjectList() {
   const handleConfirmDelete = async () => {
     if (projectToDelete) {
       try {
-        // This endpoint doesn't exist in the API yet
-        // await deleteProject(projectToDelete.project_id)
+        await deleteProject(projectToDelete.project_id)
         setProjects(projects.filter((p) => p.project_id !== projectToDelete.project_id))
         setIsDeleteDialogOpen(false)
         setProjectToDelete(null)
