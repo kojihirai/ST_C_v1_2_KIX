@@ -141,7 +141,7 @@ class MotorController:
             timeout=1,
             slave_id=1
         )
-        if not self.torque_sensor.connect():
+        if not self.torque_sensor.connected:
             self.send_error("Torque sensor failed to connect")
 
         # Threads
