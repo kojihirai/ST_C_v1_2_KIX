@@ -345,8 +345,8 @@ class MotorSystem:
             
             data = {
                 "timestamp": time.monotonic(),
-                "mode": self.mode,
-                "direction": self.direction,
+                "mode": self.mode.value,
+                "direction": self.direction.value,
                 "target": self.target,
                 "setpoint": self.pid_setpoint,
                 "pos_ticks": pos_ticks,
