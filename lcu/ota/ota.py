@@ -41,7 +41,7 @@ def send_pagerduty_alert(status):
         'payload': {
             'summary': f'Firmware Service Status Alert: {status}',
             'severity': 'critical',
-            'source': 'Firmware OTA Service',
+            'source': 'Firmware OTA Service - LCU',
             'custom_details': {
                 'status': status,
                 'service': PM2_APP_NAME,

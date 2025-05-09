@@ -10,6 +10,7 @@ from enum import Enum
 
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
+import time
 
 # === Config ===
 BROKER_IP = "192.168.2.1"
@@ -212,6 +213,7 @@ class MotorController:
     def publish_status(self):
         while self.running:
             status = {
+                "timestamp": time.monotonic(),
                 "mode": self.mode.value,
                 "direction": self.direction.value,
                 "target": self.target,
