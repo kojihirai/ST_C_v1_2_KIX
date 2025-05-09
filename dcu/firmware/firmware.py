@@ -215,7 +215,7 @@ class MotorController:
                 "mode": self.mode.value,
                 "direction": self.direction.value,
                 "target": self.target,
-                #"setpoint": self.pid_setpoint,
+                "setpoint": self.pid_setpoint,
                 "rpm": round(self.rpm_value, 1),
                 "torque": round(self.torque_value, 2),
                 "project_id": self.project_id,
