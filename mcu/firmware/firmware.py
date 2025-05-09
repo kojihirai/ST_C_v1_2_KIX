@@ -279,10 +279,38 @@ def update_project(project_id: int, data: ProjectCreate):
 
 @app.delete("/projects/{project_id}")
 def delete_project(project_id: int):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("DELETE FROM projects WHERE project_id = %s;", (project_id,))
-    conn.commit()
-    return {"message": f"Project {project_id} deleted."}
+    conn = get_conn()
+    cur = conn.cursor()
+    
+    try:
+        # Start a transaction
+        cur.execute("BEGIN")
+        
+        # First delete related records in the correct order
+        # Delete run videos
+        cur.execute("DELETE FROM run_videos WHERE run_id IN (SELECT run_id FROM runs WHERE experiment_id IN (SELECT experiment_id FROM experiments WHERE project_id = %s));", (project_id,))
+        
+        # Delete runs
+        cur.execute("DELETE FROM runs WHERE experiment_id IN (SELECT experiment_id FROM experiments WHERE project_id = %s);", (project_id,))
+        
+        # Delete experiments
+        cur.execute("DELETE FROM experiments WHERE project_id = %s;", (project_id,))
+        
+        # Finally delete the project
+        cur.execute("DELETE FROM projects WHERE project_id = %s;", (project_id,))
+        
+        # Commit the transaction
+        conn.commit()
+        
+        return {"message": f"Project {project_id} and all related data deleted successfully."}
+    except Exception as e:
+        # Rollback in case of error
+        conn.rollback()
+        print(f"Error deleting project: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting project: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
 
 # --- Experiments ---
 
