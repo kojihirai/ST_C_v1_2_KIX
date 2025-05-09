@@ -208,7 +208,7 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-                self.load_cell = LoadCell(port='/dev/ttyUSB0', baudrate=9600, parity='E', stopbits=1, bytesize=8, timeout=1, slave_id=1)
+        self.load_cell = LoadCell(port='/dev/ttyUSB0', baudrate=9600, parity='E', stopbits=1, bytesize=8, timeout=1, slave_id=1)
         self.logger = HighSpeedLogger()
 
         self.running = True
