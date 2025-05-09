@@ -5,6 +5,7 @@ import subprocess
 import json
 from datetime import datetime
 import glob
+import requests
 
 app = Flask(__name__)
 
@@ -14,8 +15,43 @@ ARCHIVE_FOLDER = os.path.join(UPLOAD_FOLDER, 'archive')
 MAX_ARCHIVE_VERSIONS = 3
 PM2_APP_NAME = 'firmware-service'  # Updated to match PM2 config
 
+# PagerDuty configuration
+PAGERDUTY_ROUTING_KEY = 'fb7168b8f0c74f0ac0b7ca3daaf80e3f'
+PAGERDUTY_EVENTS_URL = 'https://events.pagerduty.com/v2/enqueue'
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
+
+def send_pagerduty_alert(status):
+    if not PAGERDUTY_ROUTING_KEY:
+        print("PagerDuty routing key missing. Skipping alert.")
+        return
+
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    payload = {
+        'payload': {
+            'summary': f'Firmware Service Status Alert: {status}',
+            'severity': 'critical',
+            'source': 'Firmware OTA Service',
+            'custom_details': {
+                'status': status,
+                'service': PM2_APP_NAME,
+                'timestamp': datetime.now().isoformat()
+            }
+        },
+        'routing_key': PAGERDUTY_ROUTING_KEY,
+        'event_action': 'trigger'
+    }
+
+    try:
+        response = requests.post(PAGERDUTY_EVENTS_URL, headers=headers, json=payload)
+        response.raise_for_status()
+        print(f"PagerDuty alert sent successfully: {response.json()}")
+    except Exception as e:
+        print(f"Failed to send PagerDuty alert: {str(e)}")
 
 def get_pm2_status():
     try:
@@ -23,8 +59,12 @@ def get_pm2_status():
         processes = json.loads(result.stdout)
         for process in processes:
             if process['name'] == PM2_APP_NAME:
+                status = process['pm2_env']['status']
+                # Send PagerDuty alert if status is not 'online'
+                if status != 'online':
+                    send_pagerduty_alert(status)
                 return {
-                    'status': process['pm2_env']['status'],
+                    'status': status,
                     'uptime': process['pm2_env']['pm_uptime'],
                     'memory': process['monit']['memory'],
                     'cpu': process['monit']['cpu']
