@@ -6,6 +6,8 @@ import json
 from datetime import datetime
 import glob
 import requests
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -18,6 +20,10 @@ PM2_APP_NAME = 'firmware-service'  # Updated to match PM2 config
 # PagerDuty configuration
 PAGERDUTY_ROUTING_KEY = 'fb7168b8f0c74f0ac0b7ca3daaf80e3f'
 PAGERDUTY_EVENTS_URL = 'https://events.pagerduty.com/v2/enqueue'
+
+# Flag to prevent status checks during updates
+is_updating = False
+status_check_thread = None
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
@@ -86,6 +92,12 @@ def archive_current_firmware():
         for old_archive in archives[MAX_ARCHIVE_VERSIONS:]:
             os.remove(old_archive)
 
+def background_status_check():
+    while True:
+        if not is_updating:
+            get_pm2_status()
+        time.sleep(60)  # Check every minute
+
 @app.route('/')
 def index():
     pm2_status = get_pm2_status()
@@ -93,6 +105,7 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    global is_updating
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     
@@ -104,6 +117,7 @@ def upload_file():
         return jsonify({'error': 'Only Python files are allowed'}), 400
 
     try:
+        is_updating = True
         archive_current_firmware()
         
         file_path = os.path.join(UPLOAD_FOLDER, 'firmware.py')
@@ -112,8 +126,10 @@ def upload_file():
         # Restart the firmware service using PM2
         subprocess.run(['pm2', 'restart', PM2_APP_NAME])
         
+        is_updating = False
         return jsonify({'message': 'Firmware updated successfully'})
     except Exception as e:
+        is_updating = False
         return jsonify({'error': str(e)}), 500
 
 @app.route('/status')
@@ -121,4 +137,7 @@ def status():
     return jsonify(get_pm2_status())
 
 if __name__ == '__main__':
+    # Start the background status check thread
+    status_check_thread = threading.Thread(target=background_status_check, daemon=True)
+    status_check_thread.start()
     app.run(host='0.0.0.0', port=1215)
