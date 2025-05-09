@@ -74,17 +74,9 @@ class LoadCell:
         )
         self.slave_id = slave_id
         self.connected = self.client.connect()
-        try:
-            self.connected = self.client.connect()
-        except Exception as e:
-            print(f"Modbus connect error: {e}")
-            self.connected = False
 
     def __del__(self):
-        try:
-            self.client.close()
-        except:
-            pass
+        self.client.close()
 
     def decode_i32(self, registers):
         raw = (registers[0] << 16) | registers[1]
@@ -94,13 +86,17 @@ class LoadCell:
         result = self.client.read_input_registers(address=4, count=2, slave=self.slave_id)
         if not result.isError():
             return self.decode_i32(result.registers)
-        return None
+        else:
+            print("❌ Failed to read load value")
+            return None
 
     def read_status_flags(self):
         result = self.client.read_discrete_inputs(address=0, count=2, slave=self.slave_id)
         if not result.isError():
-            return result.bits[0], result.bits[1]
-        return None, None
+            return result.bits[0], result.bits[1]  # hold, stable
+        else:
+            print("❌ Failed to read status flags")
+            return None, None
 
 # ----------------------------------------------------
 # PIDController Class
