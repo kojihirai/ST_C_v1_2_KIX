@@ -79,13 +79,12 @@ origins = [
     "http://10.147.18.184:3001",
     "http://10.147.18.184:8000",
     "http://192.168.2.1:3001",
-    "http://102.168.2.10:3001",
-    "*"
+    "http://102.168.2.10:3001"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=origins,  # Use specific origins instead of wildcard
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
