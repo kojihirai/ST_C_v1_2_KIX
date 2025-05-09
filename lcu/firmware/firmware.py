@@ -335,8 +335,8 @@ class MotorSystem:
             pos_mm = pos_ticks / PULSES_PER_MM
             pos_in = pos_mm / 25.4
             
-            load_value = self.load_cell.read_load_value() if self.load_cell.connected else 0.0
-            hold, stable = self.load_cell.read_status_flags() if self.load_cell.connected else (False, False)
+            #load_value = self.load_cell.read_load_value() if self.load_cell.connected else 0.0
+            #hold, stable = self.load_cell.read_status_flags() if self.load_cell.connected else (False, False)
             
             data = {
                 "timestamp": time.monotonic(),
@@ -348,9 +348,9 @@ class MotorSystem:
                 "pos_mm": round(pos_mm, 3),
                 "pos_inches": round(pos_in, 3),
                 "current": 0.0,
-                "load": load_value if load_value is not None else 0.0,
-                "hold": 1 if hold else 0,
-                "stable": 1 if stable else 0,
+                #"load": load_value if load_value is not None else 0.0,
+                #"hold": 1 if hold else 0,
+                # "stable": 1 if stable else 0,
                 "current_speed": round(self.current_speed, 3),
                 "experiment_id": self.experiment_id,
                 "run_id": self.run_id,
