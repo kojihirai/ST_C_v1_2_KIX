@@ -93,7 +93,7 @@ app.add_middleware(
 
 # --- Database ---
 
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/data_mgmt"
+DATABASE_URL = "postgresql://dune:dune@localhost:5432/data_mgmt"
 db_pool = None
 
 def get_conn():

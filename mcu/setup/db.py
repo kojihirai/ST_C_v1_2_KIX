@@ -3,8 +3,8 @@ import psycopg2
 conn = psycopg2.connect(
     host="localhost",
     database="data_mgmt",
-    user="postgres",
-    password="postgres"
+    user="dune",
+    password="dune"
 )
 
 cursor = conn.cursor()
