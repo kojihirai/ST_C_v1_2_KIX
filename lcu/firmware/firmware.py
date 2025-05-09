@@ -211,9 +211,9 @@ class MotorSystem:
         threading.Thread(target=self.run_loop, daemon=True).start()
         threading.Thread(target=self.send_data_loop, daemon=True).start()
 
-        self.project_id = None
-        self.experiment_id = None
-        self.run_id = None
+        self.project_id = 0
+        self.experiment_id = 0
+        self.run_id = 0
 
     def _encoder_callback(self, gpio, level, tick):
         A = self.pi.read(ENC_A)
