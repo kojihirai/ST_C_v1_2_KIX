@@ -16,6 +16,7 @@ export function getLcuParams(mode: string, target: number, direction: LcuDirecti
     case "pid_pos":
     case "pid_current":
     case "pid_load":
+    case "pid_speed":
       return { pid_setpoint: target, direction: direction }
     default:
       return {}
