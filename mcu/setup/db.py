@@ -4,7 +4,7 @@ conn = psycopg2.connect(
     host="localhost",
     database="data_mgmt",
     user="dune",
-    password="dune"
+    password="dune1234"
 )
 
 cursor = conn.cursor()
