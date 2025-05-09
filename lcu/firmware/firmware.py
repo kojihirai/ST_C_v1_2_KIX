@@ -207,13 +207,14 @@ class MotorSystem:
         self.load_cell = LoadCell(port='/dev/ttyUSB0', baudrate=9600, parity='E', stopbits=1, bytesize=8, timeout=1, slave_id=1)
         self.logger = HighSpeedLogger()
 
-        self.running = True
-        threading.Thread(target=self.run_loop, daemon=True).start()
-        threading.Thread(target=self.send_data_loop, daemon=True).start()
-
+        # Initialize IDs as integers with default value 0
         self.project_id = 0
         self.experiment_id = 0
         self.run_id = 0
+
+        self.running = True
+        threading.Thread(target=self.run_loop, daemon=True).start()
+        threading.Thread(target=self.send_data_loop, daemon=True).start()
 
     def _encoder_callback(self, gpio, level, tick):
         A = self.pi.read(ENC_A)
