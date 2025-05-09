@@ -85,7 +85,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,7 +98,7 @@ DATABASE_URL = "postgresql://dune:dune1234@localhost:5432/data_mgmt"
 db_pool = None
 
 def get_conn():
-    return psycopg2.connect(host="localhost", database="data_mgmt", user="postgres", password="postgres")
+    return psycopg2.connect(host="localhost", database="data_mgmt", user="dune", password="dune1234")
 
 async def get_db():
     return await db_pool.acquire()
