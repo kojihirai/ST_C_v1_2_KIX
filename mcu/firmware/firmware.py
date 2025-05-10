@@ -53,8 +53,6 @@ class ExperimentCreate(BaseModel):
     experiment_params: Optional[dict]
 
 class RunCreate(BaseModel):
-    project_id: int
-    experiment_id: int
     run_name: str
     run_description: Optional[str]
     run_params: Optional[dict]

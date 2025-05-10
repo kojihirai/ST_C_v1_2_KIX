@@ -350,7 +350,6 @@ export function useControlSystem() {
       const commandPayload = {
         device: unit,
         command: {
-          // For LCU, always use pid_speed mode regardless of input command
           mode: command,
           direction: params.direction ?? 0,
           target: params.target ?? 0,
