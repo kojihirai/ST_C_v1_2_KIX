@@ -321,11 +321,11 @@ export const getRunsByExperiment = async (projectId: number, experimentId: numbe
   }
 };
 
-export const stopRun = async (runId: number, data: {
+export const stopRun = async (projectId: number, experimentId: number, runId: number, data: {
   status: string;
   notes?: string;
 }): Promise<void> => {
-  await axiosInstance.post(`/runs/${runId}/stop`, data);
+  await axiosInstance.post(`/projects/${projectId}/experiments/${experimentId}/runs/${runId}/stop`, data);
 };
 
 // Run Video API
