@@ -277,8 +277,8 @@ class MotorSystem:
             elif mode == Mode.PID_SPEED:
                 if not self.is_homed:
                     print("ERROR: Not homed")
-                    self.mode = Mode.IDLE
-                elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
+                    self._do_homing()
+                if now - self.last_pid_update >= PID_UPDATE_INTERVAL:
                     ref = targ if dir == Direction.FW else -targ
                     out = self.speed_pid.compute(ref, self.current_speed)
                     duty = max(min(abs(out), 100), 0)
