@@ -18,7 +18,8 @@ import ADS1263
 # === Config ===
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
-REF = 5.08  # Reference voltage for ADC
+REF = 5.0  # ADC reference voltage
+VOLTAGE_SCALE = 24.0 / 5.0  # Scale factor: 24V actual / 5V ADC full scale
 
 ADC_PINS = {
     "DRILL": 0,
@@ -26,7 +27,7 @@ ADC_PINS = {
     "LINEAR": 2,
     "VIN": 3
 }
-#Full Scale 5V
+# Full Scale 5V
 # Drill motor: IN0 - 20mv/A
 # Power In: IN1 - 100mv/A
 # Linear actuator: IN 2 -187.5 mV/A
@@ -78,8 +79,7 @@ class SensorController:
                     signed = raw - 0x100000000
                 else:
                     signed = raw
-
-                # Scale to voltage
+                    
                 voltage = signed * REF / 0x7FFFFFFF
 
                 # Convert voltage to current
@@ -90,7 +90,7 @@ class SensorController:
                 elif sensor_name == "LINEAR":
                     current = voltage / 0.1875  # 187.5 mV/A
                 elif sensor_name == "VIN":
-                    current = voltage  # direct voltage reading
+                    current = signed * REF * VOLTAGE_SCALE / 0x7FFFFFFF
 
                 measurements[sensor_name] = current
 
@@ -98,7 +98,6 @@ class SensorController:
         except Exception as e:
             print(f"Sensor read error: {e}")
             return None
-
 
     def on_message(self, client, userdata, msg):
         try:
