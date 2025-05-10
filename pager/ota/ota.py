@@ -3,40 +3,58 @@ import os
 import requests
 import json
 from datetime import datetime
+import threading
+import time
 
 app = Flask(__name__)
 
-# PagerDuty API configuration
-PAGERDUTY_API_TOKEN = 'fb7168b8f0c74f0ac0b7ca3daaf80e3f'
-PAGERDUTY_API_URL = 'https://events.pagerduty.com/v2/enqueue'
+# PagerDuty configuration
+PAGERDUTY_ROUTING_KEY = 'fb7168b8f0c74f0ac0b7ca3daaf80e3f'
+PAGERDUTY_EVENTS_URL = 'https://events.pagerduty.com/v2/enqueue'
 
-def create_pagerduty_incident(title, description, urgency='high', priority='P1'):
+# Flag to prevent status checks during updates
+is_updating = False
+status_check_thread = None
+
+def send_pagerduty_alert(title, description, urgency='high', priority='P1'):
+    if not PAGERDUTY_ROUTING_KEY:
+        print("PagerDuty routing key missing. Skipping alert.")
+        return
+
     headers = {
-        'Authorization': f'Token token={PAGERDUTY_API_TOKEN}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.pagerduty+json;version=2'
+        'Content-Type': 'application/json'
     }
-    
+
     payload = {
         'payload': {
             'summary': title,
             'severity': urgency,
-            'source': 'OTA System',
-            'custom_details': description
+            'source': 'Pager OTA Service',
+            'custom_details': {
+                'description': description,
+                'priority': priority,
+                'timestamp': datetime.now().isoformat()
+            }
         },
-        'routing_key': os.getenv('PAGERDUTY_ROUTING_KEY', PAGERDUTY_API_TOKEN),  # Use routing key or fallback to API token
-        'event_action': 'trigger',
-        'client': 'OTA System',
-        'client_url': 'http://localhost:1215'
+        'routing_key': PAGERDUTY_ROUTING_KEY,
+        'event_action': 'trigger'
     }
-    
+
     try:
-        response = requests.post(PAGERDUTY_API_URL, headers=headers, json=payload)
+        response = requests.post(PAGERDUTY_EVENTS_URL, headers=headers, json=payload)
         response.raise_for_status()
+        print(f"PagerDuty alert sent successfully: {response.json()}")
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error details: {e.response.text if hasattr(e, 'response') else str(e)}")
+    except Exception as e:
+        print(f"Failed to send PagerDuty alert: {str(e)}")
         return {'error': str(e)}
+
+def background_status_check():
+    while True:
+        if not is_updating:
+            # Check system status here if needed
+            pass
+        time.sleep(60)  # Check every minute
 
 @app.route('/')
 def index():
@@ -44,22 +62,32 @@ def index():
 
 @app.route('/create-page', methods=['POST'])
 def create_page():
+    global is_updating
     data = request.json
     
     if not all(key in data for key in ['title', 'description']):
         return jsonify({'error': 'Missing required fields'}), 400
     
-    result = create_pagerduty_incident(
-        title=data['title'],
-        description=data['description'],
-        urgency=data.get('urgency', 'high'),
-        priority=data.get('priority', 'P1')
-    )
-    
-    if 'error' in result:
-        return jsonify(result), 500
-    
-    return jsonify({'message': 'Page created successfully', 'incident': result})
+    try:
+        is_updating = True
+        result = send_pagerduty_alert(
+            title=data['title'],
+            description=data['description'],
+            urgency=data.get('urgency', 'high'),
+            priority=data.get('priority', 'P1')
+        )
+        is_updating = False
+        
+        if 'error' in result:
+            return jsonify(result), 500
+        
+        return jsonify({'message': 'Page created successfully', 'incident': result})
+    except Exception as e:
+        is_updating = False
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
+    # Start the background status check thread
+    status_check_thread = threading.Thread(target=background_status_check, daemon=True)
+    status_check_thread.start()
     app.run(host='0.0.0.0', port=1215)
