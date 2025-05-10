@@ -243,15 +243,7 @@ export function useControlSystem() {
       let validatedParams = { ...params }
       
       if (unit === "lcu") {
-        console.log("LCU command before validation:", { command, params });
-        // For LCU, validate target based on mode
-        if (command === LcuCommand.pid_speed) {
-          validatedParams.target = Math.max(0, params.target ?? 0)
-          validatedParams.pid_setpoint = validatedParams.target // Set pid_setpoint equal to target for LCU
-        } else {
-          validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 100)
-        }
-        console.log("LCU params after validation:", validatedParams);
+        validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 100)
       } else if (unit === "dcu") {
         // For DCU, always use run_cont mode
         validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 24)
@@ -359,10 +351,10 @@ export function useControlSystem() {
         device: unit,
         command: {
           // For LCU, always use pid_speed mode regardless of input command
-          mode: unit === "lcu" ? LcuCommand.pid_speed : command,
+          mode: command,
           direction: params.direction ?? 0,
           target: params.target ?? 0,
-          pid_setpoint: unit === "lcu" ? params.target ?? 0 : 0, // Set pid_setpoint equal to target for LCU
+          pid_setpoint: params.pid_setpoint ?? 0,
           duration: 0,
           project_id: selectedProjectId || 0,
           experiment_id: selectedExperiment || 0,
