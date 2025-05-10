@@ -304,8 +304,34 @@ export function useControlSystem() {
     if (systemStatus === "stopped" && (command === LcuCommand.pid_speed || command === DcuCommand.run_cont)) {
       // Only send both commands if this is the first command being sent
       if (unit === "lcu") {
-        await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
-        await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
+        const lcuCommand = {
+          device: "lcu",
+          command: {
+            mode: LcuCommand.pid_speed,
+            direction: lcuDirection,
+            target: lcuTarget,
+            pid_setpoint: lcuTarget,
+            duration: 0,
+            project_id: selectedProjectId || 0,
+            experiment_id: selectedExperiment || 0,
+            run_id: currentRunId || 0
+          }
+        }
+        const dcuCommand = {
+          device: "dcu",
+          command: {
+            mode: DcuCommand.run_cont,
+            direction: dcuDirection,
+            target: dcuTarget,
+            pid_setpoint: 0,
+            duration: 0,
+            project_id: selectedProjectId || 0,
+            experiment_id: selectedExperiment || 0,
+            run_id: currentRunId || 0
+          }
+        }
+        await (apiClient.sendCommand as any)(lcuCommand)
+        await (apiClient.sendCommand as any)(dcuCommand)
       }
       return
     }
@@ -313,8 +339,20 @@ export function useControlSystem() {
     // Otherwise only send the command for the changed unit
     if (unit === changedUnit) {
       // Force correct modes for each unit
-      const finalCommand = unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont;
-      await sendCommand(unit, finalCommand, params)
+      const commandPayload = {
+        device: unit,
+        command: {
+          mode: unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont,
+          direction: params.direction ?? 0,
+          target: params.target ?? 0,
+          pid_setpoint: unit === "lcu" ? params.target ?? 0 : 0,
+          duration: 0,
+          project_id: selectedProjectId || 0,
+          experiment_id: selectedExperiment || 0,
+          run_id: currentRunId || 0
+        }
+      }
+      await (apiClient.sendCommand as any)(commandPayload)
     }
   }
 

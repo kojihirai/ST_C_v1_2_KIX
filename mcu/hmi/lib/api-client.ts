@@ -357,8 +357,23 @@ export const sendCommand = async (data: {
   }
 }): Promise<CommandResponse> => {
   try {
-    console.log(`Sending ${data.device} command:`, data)
-    const response = await axiosInstance.post('/send_command/', data)
+    // Ensure command is properly nested
+    const commandPayload = {
+      device: data.device,
+      command: {
+        mode: data.command.mode,
+        direction: data.command.direction,
+        target: data.command.target,
+        pid_setpoint: data.command.pid_setpoint ?? 0,
+        duration: data.command.duration ?? 0,
+        project_id: data.command.project_id ?? 0,
+        experiment_id: data.command.experiment_id ?? 0,
+        run_id: data.command.run_id ?? 0
+      }
+    }
+
+    console.log(`Sending ${data.device} command:`, commandPayload)
+    const response = await axiosInstance.post('/send_command/', commandPayload)
     console.log(`${data.device} command response:`, response.data)
     return response.data
   } catch (error) {
