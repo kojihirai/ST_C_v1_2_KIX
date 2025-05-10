@@ -241,6 +241,7 @@ class MotorSystem:
 
     def on_message(self, client, userdata, msg):
         try:
+            print(f"Received: {msg.payload.decode()}")
             data = json.loads(msg.payload.decode())
             self.mode = Mode(data.get("mode", 0))
             self.direction = Direction(data.get("direction", 0))
