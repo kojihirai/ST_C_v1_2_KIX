@@ -455,20 +455,19 @@ export function useControlSystem() {
       
       // Only try to end the run if we have a currentRunId
       if (currentRunId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const endRunResponse = await (apiClient.endRun as any)(
-          selectedProjectId,
-          selectedExperiment,
-          currentRunId,
-          { status: "completed", notes: "Stopped by user" }
-        );
-
-        if ((endRunResponse as any).success) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (apiClient.endRun as any)(
+            selectedProjectId,
+            selectedExperiment,
+            currentRunId,
+            { status: "completed", notes: "Stopped by user" }
+          );
+          
           setCurrentRunId(null);
           console.log("Experiment run ended successfully");
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          console.log("Run end response:", (endRunResponse as any).message);
+        } catch (error) {
+          console.error("Error ending run:", error);
         }
       } else {
         console.log("No active run to end, just stopping the experiment");
