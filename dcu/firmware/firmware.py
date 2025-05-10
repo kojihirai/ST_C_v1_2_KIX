@@ -182,7 +182,11 @@ class MotorController:
             self.send_error(f"MQTT command error: {e}")
 
     def set_motor(self, value):
-        pwm_val = int(min(max(abs(value), 0), 100) * 2.55)
+        # Convert voltage (0-24V) to duty cycle percentage (0-100%)
+        # Assuming 24V is 100% duty cycle
+        duty_cycle = (abs(value) / 24.0) * 100.0
+        pwm_val = int(min(max(duty_cycle, 0), 100) * 2.55)  # Convert to 0-255 range
+        
         forward = value >= 0 if self.direction == Direction.CW else value < 0
         if forward:
             self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], pwm_val)

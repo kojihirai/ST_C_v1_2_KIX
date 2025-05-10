@@ -110,6 +110,36 @@ export function useControlSystem() {
   const [lcuDuration, setLcuDuration] = useState(5)
   const [dcuDuration, setDcuDuration] = useState(5)
 
+  // Helper functions for value conversion and validation
+  const validateLcuTarget = (value: number, mode: string) => {
+    if (mode === "pid_speed") {
+      // For PID speed mode, value is in mm/s
+      return Math.max(0, value)
+    } else {
+      // For other modes, value is duty cycle percentage (0-100)
+      return Math.min(Math.max(value, 0), 100)
+    }
+  }
+
+  const validateDcuTarget = (value: number, mode: string) => {
+    if (mode === "pid_speed") {
+      // For PID speed mode, value is in RPM
+      return Math.max(0, value)
+    } else {
+      // For other modes, value is voltage (0-24V)
+      return Math.min(Math.max(value, 0), 24)
+    }
+  }
+
+  // Update target setters to use validation
+  const setLcuTargetWithValidation = (value: number) => {
+    setLcuTarget(validateLcuTarget(value, lcuMode))
+  }
+
+  const setDcuTargetWithValidation = (value: number) => {
+    setDcuTarget(validateDcuTarget(value, dcuMode))
+  }
+
   useEffect(() => {
     websocket.onStatusChange((status) => {
       setWsConnected(status === "connected")
@@ -289,22 +319,40 @@ export function useControlSystem() {
 
   const sendCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
     try {
-      const commandPayload = {
-        mode: command,
-        direction: params.direction ?? 0,
-        pid_setpoint: params.pid_setpoint ?? 0,
-        duration: params.duration ?? 0,
-        target: params.target ?? 0
-      }
+      // Validate and convert parameters based on unit and command
+      let validatedParams = { ...params }
       
-      console.log('Preparing command:', commandPayload)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (unit === "lcu") {
+        if (command === LcuCommand.pid_speed) {
+          // For PID speed mode, ensure target is in mm/s
+          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
+        } else if (command === LcuCommand.run_cont || command === LcuCommand.run_dur) {
+          // For run modes, ensure target is duty cycle percentage (0-100)
+          validatedParams.target = Math.min(Math.max(params.target, 0), 100)
+        }
+      } else if (unit === "dcu") {
+        if (command === DcuCommand.pid_speed) {
+          // For PID speed mode, ensure target is in RPM
+          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
+        } else if (command === DcuCommand.run_cont || command === DcuCommand.run_dur) {
+          // For run modes, ensure target is voltage (0-24V)
+          validatedParams.target = Math.min(Math.max(params.target, 0), 24)
+        }
+      }
+
+      const commandPayload = {
+        unit,
+        command,
+        params: validatedParams,
+        project_id: selectedProjectId,
+        experiment_id: selectedExperiment,
+        run_id: currentRunId
+      }
+
+      console.log(`Sending ${unit} command:`, commandPayload)
       const response = await (apiClient.sendCommand as any)(unit, commandPayload)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((response as any).message?.includes(`Command sent to ${unit}`)) {
-        console.log(`Successfully sent command to ${unit}`)
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+      if (!response.success) {
         console.error(`Failed to send ${unit} command:`, (response as any).message)
       }
     } catch (error) {
