@@ -588,7 +588,7 @@ def signal_handler(sig, frame):
 def main():
     import uvicorn
     signal.signal(signal.SIGINT, signal_handler)
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")
+    uvicorn.run(app, host="10.147.18.184", port=8000, log_level="debug")
 
 if __name__ == "__main__":
     main()

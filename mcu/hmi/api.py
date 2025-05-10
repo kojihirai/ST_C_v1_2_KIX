@@ -69,6 +69,7 @@ class RunVideoCreate(BaseModel):
 
 app = FastAPI()
 
+# Allow all origins for development - in production, you should restrict this
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -76,6 +77,7 @@ origins = [
     "http://127.0.0.1:3001",
     "http://mcu.local:3001",
     "http://10.147.18.184:3001",
+    "http://10.147.18.184:8000",
     "http://192.168.2.1:3001",
     "http://102.168.2.10:3001",
     "*"  # Allow all for testing

@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// API base URL - adjust as needed
-// const API_BASE_URL = 'http://localhost:8000';
-const API_BASE_URL = 'http://10.147.18.184:8000';
+// API base URL from environment variable, fallback to localhost
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 // Type definitions for parameters
 export interface ProjectParams {
   [key: string]: string | number | boolean | null | ProjectParams;
