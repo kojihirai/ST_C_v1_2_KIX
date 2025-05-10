@@ -54,6 +54,16 @@ class SensorController:
         threading.Thread(target=self.run, daemon=True).start()
         threading.Thread(target=self.publish_status, daemon=True).start()
 
+    def run(self):
+        """Main run loop for the controller"""
+        while self.running:
+            try:
+                # Main processing loop
+                time.sleep(0.1)  # Small sleep to prevent CPU hogging
+            except Exception as e:
+                self.send_error(f"Run loop error: {e}")
+                time.sleep(1)  # Longer sleep on error
+
     def read_sensors(self):
         try:
             # Get all ADC values for our channels

@@ -205,7 +205,7 @@ class MotorSystem:
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
         self.load_cell = LoadCell(port='/dev/ttyUSB0', baudrate=9600, parity='E', stopbits=1, bytesize=8, timeout=1, slave_id=1)
-        self.logger = HighSpeedLogger()
+        # self.logger = HighSpeedLogger()
 
         # Initialize IDs as integers with default value 0
         self.project_id = 0
@@ -368,7 +368,7 @@ class MotorSystem:
                 "run_id": self.run_id,
                 "project_id": self.project_id,
             }
-            self.logger.log(data)
+            # self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
             print(f"Published data: {data}") 
             time.sleep(0.2)
@@ -376,7 +376,7 @@ class MotorSystem:
     def stop(self):
         self.running = False
         self.control_motor(0, Direction.IDLE)
-        self.logger.stop()
+        # self.logger.stop()
         self.client.loop_stop()
         self.pi.stop()
         if hasattr(self, 'load_cell'):
