@@ -22,33 +22,54 @@ def send_pagerduty_alert(title, description, urgency='high', priority='P1'):
         return
 
     headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.pagerduty+json;version=2'
+        'Content-Type': 'application/json'
     }
 
+    # Map urgency to valid PagerDuty severity
+    severity_map = {
+        'high': 'critical',
+        'medium': 'warning',
+        'low': 'info'
+    }
+    severity = severity_map.get(urgency.lower(), 'critical')
+
     payload = {
+        'routing_key': PAGERDUTY_ROUTING_KEY,
+        'event_action': 'trigger',
         'payload': {
             'summary': title,
-            'severity': urgency,
+            'severity': severity,
             'source': 'Pager OTA Service',
             'custom_details': {
                 'description': description,
                 'priority': priority,
+                'urgency': urgency,
                 'timestamp': datetime.now().isoformat()
             }
-        },
-        'routing_key': PAGERDUTY_ROUTING_KEY,
-        'event_action': 'trigger'
+        }
     }
 
     try:
+        print(f"Sending payload to PagerDuty: {json.dumps(payload, indent=2)}")
         response = requests.post(PAGERDUTY_EVENTS_URL, headers=headers, json=payload)
-        response.raise_for_status()
+        
+        if response.status_code != 202:
+            error_msg = f"PagerDuty API error: {response.status_code}\nResponse: {response.text}"
+            print(error_msg)
+            return {'error': error_msg}
+            
         print(f"PagerDuty alert sent successfully: {response.json()}")
         return response.json()
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Failed to send PagerDuty alert: {str(e)}"
+        if hasattr(e, 'response') and e.response is not None:
+            error_msg += f"\nResponse: {e.response.text}"
+        print(error_msg)
+        return {'error': error_msg}
     except Exception as e:
-        print(f"Failed to send PagerDuty alert: {str(e)}")
-        return {'error': str(e)}
+        error_msg = f"Unexpected error sending PagerDuty alert: {str(e)}"
+        print(error_msg)
+        return {'error': error_msg}
 
 def background_status_check():
     while True:
