@@ -12,9 +12,13 @@ from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
 import time
 
+import RPi.GPIO as GPIO
+import ADS1263
+
 # === Config ===
 BROKER_IP = "192.168.2.4"
 DEVICE_ID = "sdu"
+REF = 5.08  # Reference voltage for ADC
 
 ADC_PINS = {
     "DRILL": 0,
@@ -42,14 +46,45 @@ class SensorController:
         self.run_id = 0
         # Threads
         self.running = True
+        # Initialize ADC
+        self.ADC = ADS1263.ADS1263()
+        if (self.ADC.ADS1263_init_ADC1('ADS1263_400SPS') == -1):
+            raise Exception("Failed to initialize ADC")
+        self.ADC.ADS1263_SetMode(0)  # 0 is singleChannel mode
         threading.Thread(target=self.run, daemon=True).start()
         threading.Thread(target=self.publish_status, daemon=True).start()
 
     def read_sensors(self):
         try:
-            pass
+            # Get all ADC values for our channels
+            channel_list = list(ADC_PINS.values())
+            adc_values = self.ADC.ADS1263_GetAll(channel_list)
+            
+            # Convert ADC values to actual measurements
+            measurements = {}
+            for sensor_name, channel in ADC_PINS.items():
+                adc_value = adc_values[channel]
+                if adc_value >> 31 == 1:  # Negative value
+                    voltage = -(REF * 2 - adc_value * REF / 0x80000000)
+                else:  # Positive value
+                    voltage = adc_value * REF / 0x7fffffff
+                
+                # Convert voltage to current based on sensor specifications
+                if sensor_name == "DRILL":
+                    current = voltage / 0.020  # 20mV/A
+                elif sensor_name == "POWER":
+                    current = voltage / 0.100  # 100mV/A
+                elif sensor_name == "LINEAR":
+                    current = voltage / 0.1875  # 187.5mV/A
+                elif sensor_name == "VIN":
+                    current = voltage  # This is actually voltage, not current
+                
+                measurements[sensor_name] = current
+            
+            return measurements
         except Exception as e:
             print(f"Sensor read error: {e}")
+            return None
 
     def on_message(self, client, userdata, msg):
         try:
@@ -62,15 +97,20 @@ class SensorController:
 
     def publish_status(self):
         while self.running:
-            status = {
-                "timestamp": time.monotonic(),
-                "DRILL_CURRENT": 0,
-                "POWER_CURRENT": 0,
-                "LINEAR_CURRENT": 0,
-                "VIN_VOLTAGE": 0
-            }
-            self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
-            print("Status:", status)
+            measurements = self.read_sensors()
+            if measurements:
+                status = {
+                    "timestamp": time.monotonic(),
+                    "DRILL_CURRENT": measurements["DRILL"],
+                    "POWER_CURRENT": measurements["POWER"],
+                    "LINEAR_CURRENT": measurements["LINEAR"],
+                    "VIN_VOLTAGE": measurements["VIN"],
+                    "project_id": self.project_id,
+                    "experiment_id": self.experiment_id,
+                    "run_id": self.run_id
+                }
+                self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
+                print("Status:", status)
             time.sleep(0.2)
 
     def send_error(self, msg):
@@ -80,6 +120,7 @@ class SensorController:
 
     def stop(self):
         self.running = False
+        self.ADC.ADS1263_Exit()  # Clean up ADC
         self.client.loop_stop()
         print("SDU stopped.")
 
