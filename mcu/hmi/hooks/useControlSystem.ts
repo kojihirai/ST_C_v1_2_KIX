@@ -352,17 +352,15 @@ export function useControlSystem() {
         }
       }
 
+      // Format command to match what the API and firmware expect
       const commandPayload = {
         device: unit,
         command: {
           mode: command,
           direction: validatedParams.direction ?? 0,
-          pid_setpoint: validatedParams.pid_setpoint ?? 0,
-          duration: validatedParams.duration ?? 0,
           target: validatedParams.target ?? 0,
-          project_id: selectedProjectId,
-          experiment_id: selectedExperiment,
-          run_id: currentRunId
+          pid_setpoint: validatedParams.pid_setpoint ?? 0,
+          duration: validatedParams.duration ?? 0
         }
       }
 
