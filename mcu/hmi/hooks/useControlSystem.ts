@@ -456,7 +456,7 @@ export function useControlSystem() {
       // Only try to end the run if we have a currentRunId
       if (currentRunId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const endRunResponse = await (apiClient.endRun as any)(selectedProjectId, selectedExperiment);
+        const endRunResponse = await (apiClient.endRun as any)(selectedProjectId, selectedExperiment, currentRunId);
 
         if ((endRunResponse as any).success) {
           setCurrentRunId(null);
