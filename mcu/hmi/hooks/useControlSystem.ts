@@ -208,6 +208,138 @@ export function useControlSystem() {
     }
   }
 
+  // Track which unit changed and if we're currently sending commands
+  const [changedUnit, setChangedUnit] = useState<"lcu" | "dcu" | null>(null)
+  const [isSendingCommand, setIsSendingCommand] = useState(false)
+
+  // Update changedUnit and auto-set modes when LCU or DCU values change
+  useEffect(() => {
+    if (isSendingCommand) return; // Don't trigger if we're already sending a command
+
+    if (lcuMode !== "idle" || lcuTarget !== 0 || lcuDirection !== LcuDirection.idle) {
+      setChangedUnit("lcu")
+      // Auto-set LCU mode to pid_speed when values change
+      if (lcuMode === "idle") {
+        setLcuMode("pid_speed")
+      }
+    }
+  }, [lcuMode, lcuTarget, lcuDirection, isSendingCommand])
+
+  useEffect(() => {
+    if (isSendingCommand) return; // Don't trigger if we're already sending a command
+
+    if (dcuMode !== "idle" || dcuTarget !== 0 || dcuDirection !== DcuDirection.idle) {
+      setChangedUnit("dcu")
+      // Auto-set DCU mode to run_cont when values change
+      if (dcuMode === "idle") {
+        setDcuMode("run_cont")
+      }
+    }
+  }, [dcuMode, dcuTarget, dcuDirection, isSendingCommand])
+
+  const sendCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
+    if (isSendingCommand) return false; // Prevent multiple simultaneous sends
+    
+    try {
+      setIsSendingCommand(true);
+      
+      // Validate and convert parameters based on unit and command
+      let validatedParams = { ...params }
+      
+      if (unit === "lcu") {
+        if (command === LcuCommand.pid_speed) {
+          // For PID speed mode, ensure target is in mm/s
+          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
+        } else if (command === LcuCommand.run_cont || command === LcuCommand.run_dur) {
+          // For run modes, ensure target is duty cycle percentage (0-100)
+          validatedParams.target = Math.min(Math.max(params.target, 0), 100)
+        }
+      } else if (unit === "dcu") {
+        if (command === DcuCommand.pid_speed) {
+          // For PID speed mode, ensure target is in RPM
+          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
+        } else if (command === DcuCommand.run_cont || command === DcuCommand.run_dur) {
+          // For run modes, ensure target is voltage (0-24V)
+          validatedParams.target = Math.min(Math.max(params.target, 0), 24)
+        }
+      }
+
+      // Format command to match what the API and firmware expect
+      const commandPayload = {
+        device: unit,
+        command: {
+          mode: command,
+          direction: validatedParams.direction ?? 0,
+          target: validatedParams.target ?? 0,
+          pid_setpoint: validatedParams.pid_setpoint ?? 0,
+          duration: validatedParams.duration ?? 0
+        }
+      }
+
+      console.log(`Sending ${unit} command:`, commandPayload)
+      const response = await (apiClient.sendCommand as any)(commandPayload)
+      console.log(`${unit} command response:`, response)
+
+      if (!response.success) {
+        console.error(`Failed to send ${unit} command:`, response.message)
+        return false
+      }
+
+      console.log(`Successfully sent ${unit} command:`, response.message)
+      return true
+    } catch (error) {
+      console.error(`Error sending ${unit} command:`, error)
+      return false
+    } finally {
+      setIsSendingCommand(false);
+    }
+  }
+
+  // Only send command for the changed unit
+  const executeCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
+    if (isSendingCommand) return; // Prevent multiple simultaneous sends
+
+    // Handle stop/idle commands
+    if (command === LcuCommand.idle || command === DcuCommand.idle) {
+      if (unit === "lcu") {
+        setLcuMode("idle")
+        await sendCommand("lcu", LcuCommand.idle, {})
+      } else {
+        setDcuMode("idle")
+        await sendCommand("dcu", DcuCommand.idle, {})
+      }
+      return
+    }
+
+    // Only send commands when explicitly called through startManual or startExperiment
+    if (systemStatus === "stopped" && (command === LcuCommand.pid_speed || command === DcuCommand.run_cont)) {
+      // Only send both commands if this is the first command being sent
+      if (unit === "lcu") {
+        await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
+        await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
+      }
+      return
+    }
+    
+    // Otherwise only send the command for the changed unit
+    if (unit === changedUnit) {
+      // Ensure LCU uses pid_speed and DCU uses run_cont
+      const finalCommand = unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont;
+      await sendCommand(unit, finalCommand, params)
+    }
+  }
+
+  const startManual = async () => {
+    try {
+      // Send both LCU and DCU commands when starting
+      await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
+      await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
+      setSystemStatus("running")
+    } catch (error) {
+      console.error("Failed to start manual:", error)
+    }
+  }
+
   const startExperiment = async () => {
     if (!selectedProjectId || !selectedExperiment) {
       console.error("Cannot start experiment: Missing project or experiment", {
@@ -309,17 +441,6 @@ export function useControlSystem() {
     }
   };
 
-  const startManual = async () => {
-    try {
-      // Send both LCU and DCU commands when starting
-      await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
-      await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
-      setSystemStatus("running")
-    } catch (error) {
-      console.error("Failed to start manual:", error)
-    }
-  }
-
   const stopManual = async () => {
     try {
       // Send idle commands to both LCU and DCU
@@ -331,172 +452,6 @@ export function useControlSystem() {
       setSystemStatus("stopped")
     } catch (error) {
       console.error("Error stopping manual:", error)
-    }
-  }
-
-  // Track which unit changed and if we're currently sending commands
-  const [changedUnit, setChangedUnit] = useState<"lcu" | "dcu" | null>(null)
-  const [isSendingCommand, setIsSendingCommand] = useState(false)
-  const [lastSentValues, setLastSentValues] = useState({
-    lcu: { target: 0, direction: LcuDirection.idle },
-    dcu: { target: 0, direction: DcuDirection.idle }
-  })
-
-  // Update changedUnit and auto-set modes when LCU or DCU values change
-  useEffect(() => {
-    if (isSendingCommand) return; // Don't trigger if we're already sending a command
-
-    if (lcuMode !== "idle" || lcuTarget !== 0 || lcuDirection !== LcuDirection.idle) {
-      setChangedUnit("lcu")
-      // Auto-set LCU mode to pid_speed when values change
-      if (lcuMode === "idle") {
-        setLcuMode("pid_speed")
-      }
-    }
-  }, [lcuMode, lcuTarget, lcuDirection, isSendingCommand])
-
-  useEffect(() => {
-    if (isSendingCommand) return; // Don't trigger if we're already sending a command
-
-    if (dcuMode !== "idle" || dcuTarget !== 0 || dcuDirection !== DcuDirection.idle) {
-      setChangedUnit("dcu")
-      // Auto-set DCU mode to run_cont when values change
-      if (dcuMode === "idle") {
-        setDcuMode("run_cont")
-      }
-    }
-  }, [dcuMode, dcuTarget, dcuDirection, isSendingCommand])
-
-  // Only send command when values actually change
-  useEffect(() => {
-    if (isSendingCommand || systemStatus === "stopped") return;
-
-    const hasLcuChanged = 
-      lcuTarget !== lastSentValues.lcu.target || 
-      lcuDirection !== lastSentValues.lcu.direction;
-
-    const hasDcuChanged = 
-      dcuTarget !== lastSentValues.dcu.target || 
-      dcuDirection !== lastSentValues.dcu.direction;
-
-    if (hasLcuChanged) {
-      executeCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
-      setLastSentValues(prev => ({
-        ...prev,
-        lcu: { target: lcuTarget, direction: lcuDirection }
-      }))
-    }
-
-    if (hasDcuChanged) {
-      executeCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
-      setLastSentValues(prev => ({
-        ...prev,
-        dcu: { target: dcuTarget, direction: dcuDirection }
-      }))
-    }
-  }, [lcuTarget, lcuDirection, dcuTarget, dcuDirection, systemStatus])
-
-  const sendCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
-    if (isSendingCommand) return false; // Prevent multiple simultaneous sends
-    
-    try {
-      setIsSendingCommand(true);
-      
-      // Validate and convert parameters based on unit and command
-      let validatedParams = { ...params }
-      
-      if (unit === "lcu") {
-        if (command === LcuCommand.pid_speed) {
-          // For PID speed mode, ensure target is in mm/s
-          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
-        } else if (command === LcuCommand.run_cont || command === LcuCommand.run_dur) {
-          // For run modes, ensure target is duty cycle percentage (0-100)
-          validatedParams.target = Math.min(Math.max(params.target, 0), 100)
-        }
-      } else if (unit === "dcu") {
-        if (command === DcuCommand.pid_speed) {
-          // For PID speed mode, ensure target is in RPM
-          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
-        } else if (command === DcuCommand.run_cont || command === DcuCommand.run_dur) {
-          // For run modes, ensure target is voltage (0-24V)
-          validatedParams.target = Math.min(Math.max(params.target, 0), 24)
-        }
-      }
-
-      // Format command to match what the API and firmware expect
-      const commandPayload = {
-        device: unit,
-        command: {
-          mode: command,
-          direction: validatedParams.direction ?? 0,
-          target: validatedParams.target ?? 0,
-          pid_setpoint: validatedParams.pid_setpoint ?? 0,
-          duration: validatedParams.duration ?? 0
-        }
-      }
-
-      console.log(`Sending ${unit} command:`, commandPayload)
-      const response = await (apiClient.sendCommand as any)(commandPayload)
-      console.log(`${unit} command response:`, response)
-
-      if (!response.success) {
-        console.error(`Failed to send ${unit} command:`, response.message)
-        return false
-      }
-
-      console.log(`Successfully sent ${unit} command:`, response.message)
-      return true
-    } catch (error) {
-      console.error(`Error sending ${unit} command:`, error)
-      return false
-    } finally {
-      setIsSendingCommand(false);
-    }
-  }
-
-  // Only send command for the changed unit
-  const executeCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
-    if (isSendingCommand) return; // Prevent multiple simultaneous sends
-
-    // Handle stop/idle commands
-    if (command === LcuCommand.idle || command === DcuCommand.idle) {
-      if (unit === "lcu") {
-        setLcuMode("idle")
-        await sendCommand("lcu", LcuCommand.idle, {})
-        setLastSentValues(prev => ({
-          ...prev,
-          lcu: { target: 0, direction: LcuDirection.idle }
-        }))
-      } else {
-        setDcuMode("idle")
-        await sendCommand("dcu", DcuCommand.idle, {})
-        setLastSentValues(prev => ({
-          ...prev,
-          dcu: { target: 0, direction: DcuDirection.idle }
-        }))
-      }
-      return
-    }
-
-    // Always send both commands during start operations
-    if (systemStatus === "stopped" && (command === LcuCommand.pid_speed || command === DcuCommand.run_cont)) {
-      // Only send both commands if this is the first command being sent
-      if (unit === "lcu") {
-        await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
-        await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
-        setLastSentValues({
-          lcu: { target: lcuTarget, direction: lcuDirection },
-          dcu: { target: dcuTarget, direction: dcuDirection }
-        })
-      }
-      return
-    }
-    
-    // Otherwise only send the command for the changed unit
-    if (unit === changedUnit) {
-      // Ensure LCU uses pid_speed and DCU uses run_cont
-      const finalCommand = unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont;
-      await sendCommand(unit, finalCommand, params)
     }
   }
 
