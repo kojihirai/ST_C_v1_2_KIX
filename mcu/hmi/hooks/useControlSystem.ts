@@ -334,8 +334,41 @@ export function useControlSystem() {
     }
   }
 
+  // Track which unit changed and if we're currently sending commands
+  const [changedUnit, setChangedUnit] = useState<"lcu" | "dcu" | null>(null)
+  const [isSendingCommand, setIsSendingCommand] = useState(false)
+
+  // Update changedUnit and auto-set modes when LCU or DCU values change
+  useEffect(() => {
+    if (isSendingCommand) return; // Don't trigger if we're already sending a command
+
+    if (lcuMode !== "idle" || lcuTarget !== 0 || lcuDirection !== LcuDirection.idle) {
+      setChangedUnit("lcu")
+      // Auto-set LCU mode to pid_speed when values change
+      if (lcuMode === "idle") {
+        setLcuMode("pid_speed")
+      }
+    }
+  }, [lcuMode, lcuTarget, lcuDirection, isSendingCommand])
+
+  useEffect(() => {
+    if (isSendingCommand) return; // Don't trigger if we're already sending a command
+
+    if (dcuMode !== "idle" || dcuTarget !== 0 || dcuDirection !== DcuDirection.idle) {
+      setChangedUnit("dcu")
+      // Auto-set DCU mode to run_cont when values change
+      if (dcuMode === "idle") {
+        setDcuMode("run_cont")
+      }
+    }
+  }, [dcuMode, dcuTarget, dcuDirection, isSendingCommand])
+
   const sendCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
+    if (isSendingCommand) return false; // Prevent multiple simultaneous sends
+    
     try {
+      setIsSendingCommand(true);
+      
       // Validate and convert parameters based on unit and command
       let validatedParams = { ...params }
       
@@ -383,35 +416,15 @@ export function useControlSystem() {
     } catch (error) {
       console.error(`Error sending ${unit} command:`, error)
       return false
+    } finally {
+      setIsSendingCommand(false);
     }
   }
 
-  // Track which unit changed
-  const [changedUnit, setChangedUnit] = useState<"lcu" | "dcu" | null>(null)
-
-  // Update changedUnit and auto-set modes when LCU or DCU values change
-  useEffect(() => {
-    if (lcuMode !== "idle" || lcuTarget !== 0 || lcuDirection !== LcuDirection.idle) {
-      setChangedUnit("lcu")
-      // Auto-set LCU mode to pid_speed when values change
-      if (lcuMode === "idle") {
-        setLcuMode("pid_speed")
-      }
-    }
-  }, [lcuMode, lcuTarget, lcuDirection])
-
-  useEffect(() => {
-    if (dcuMode !== "idle" || dcuTarget !== 0 || dcuDirection !== DcuDirection.idle) {
-      setChangedUnit("dcu")
-      // Auto-set DCU mode to run_cont when values change
-      if (dcuMode === "idle") {
-        setDcuMode("run_cont")
-      }
-    }
-  }, [dcuMode, dcuTarget, dcuDirection])
-
   // Only send command for the changed unit
   const executeCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
+    if (isSendingCommand) return; // Prevent multiple simultaneous sends
+
     // Handle stop/idle commands
     if (command === LcuCommand.idle || command === DcuCommand.idle) {
       if (unit === "lcu") {
