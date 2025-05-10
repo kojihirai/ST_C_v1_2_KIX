@@ -337,6 +337,10 @@ export function useControlSystem() {
   // Track which unit changed and if we're currently sending commands
   const [changedUnit, setChangedUnit] = useState<"lcu" | "dcu" | null>(null)
   const [isSendingCommand, setIsSendingCommand] = useState(false)
+  const [lastSentValues, setLastSentValues] = useState({
+    lcu: { target: 0, direction: LcuDirection.idle },
+    dcu: { target: 0, direction: DcuDirection.idle }
+  })
 
   // Update changedUnit and auto-set modes when LCU or DCU values change
   useEffect(() => {
@@ -362,6 +366,35 @@ export function useControlSystem() {
       }
     }
   }, [dcuMode, dcuTarget, dcuDirection, isSendingCommand])
+
+  // Only send command when values actually change
+  useEffect(() => {
+    if (isSendingCommand || systemStatus === "stopped") return;
+
+    const hasLcuChanged = 
+      lcuTarget !== lastSentValues.lcu.target || 
+      lcuDirection !== lastSentValues.lcu.direction;
+
+    const hasDcuChanged = 
+      dcuTarget !== lastSentValues.dcu.target || 
+      dcuDirection !== lastSentValues.dcu.direction;
+
+    if (hasLcuChanged) {
+      executeCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
+      setLastSentValues(prev => ({
+        ...prev,
+        lcu: { target: lcuTarget, direction: lcuDirection }
+      }))
+    }
+
+    if (hasDcuChanged) {
+      executeCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
+      setLastSentValues(prev => ({
+        ...prev,
+        dcu: { target: dcuTarget, direction: dcuDirection }
+      }))
+    }
+  }, [lcuTarget, lcuDirection, dcuTarget, dcuDirection, systemStatus])
 
   const sendCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
     if (isSendingCommand) return false; // Prevent multiple simultaneous sends
@@ -430,9 +463,17 @@ export function useControlSystem() {
       if (unit === "lcu") {
         setLcuMode("idle")
         await sendCommand("lcu", LcuCommand.idle, {})
+        setLastSentValues(prev => ({
+          ...prev,
+          lcu: { target: 0, direction: LcuDirection.idle }
+        }))
       } else {
         setDcuMode("idle")
         await sendCommand("dcu", DcuCommand.idle, {})
+        setLastSentValues(prev => ({
+          ...prev,
+          dcu: { target: 0, direction: DcuDirection.idle }
+        }))
       }
       return
     }
@@ -443,6 +484,10 @@ export function useControlSystem() {
       if (unit === "lcu") {
         await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
         await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
+        setLastSentValues({
+          lcu: { target: lcuTarget, direction: lcuDirection },
+          dcu: { target: dcuTarget, direction: dcuDirection }
+        })
       }
       return
     }
