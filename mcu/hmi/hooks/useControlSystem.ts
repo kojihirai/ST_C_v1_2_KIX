@@ -252,7 +252,7 @@ export function useControlSystem() {
         
         // Send both LCU and DCU commands when starting
         console.log("Sending LCU command...");
-        await sendCommand("lcu", LcuCommand.run_cont, { target: lcuTarget, direction: lcuDirection });
+        await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection });
         console.log("Sending DCU command...");
         await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection });
         
@@ -312,7 +312,7 @@ export function useControlSystem() {
   const startManual = async () => {
     try {
       // Send both LCU and DCU commands when starting
-      await sendCommand("lcu", LcuCommand.run_cont, { target: lcuTarget, direction: lcuDirection })
+      await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
       await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
       setSystemStatus("running")
     } catch (error) {
@@ -425,10 +425,10 @@ export function useControlSystem() {
     }
 
     // Always send both commands during start operations
-    if (systemStatus === "stopped" && (command === LcuCommand.run_cont || command === DcuCommand.run_cont)) {
+    if (systemStatus === "stopped" && (command === LcuCommand.pid_speed || command === DcuCommand.run_cont)) {
       // Only send both commands if this is the first command being sent
       if (unit === "lcu") {
-        await sendCommand("lcu", LcuCommand.run_cont, { target: lcuTarget, direction: lcuDirection })
+        await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection })
         await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection })
       }
       return
@@ -436,7 +436,9 @@ export function useControlSystem() {
     
     // Otherwise only send the command for the changed unit
     if (unit === changedUnit) {
-      await sendCommand(unit, command, params)
+      // Ensure LCU uses pid_speed and DCU uses run_cont
+      const finalCommand = unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont;
+      await sendCommand(unit, finalCommand, params)
     }
   }
 
