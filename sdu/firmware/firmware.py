@@ -66,35 +66,39 @@ class SensorController:
 
     def read_sensors(self):
         try:
-            # Get all ADC values for our channels
             channel_list = list(ADC_PINS.values())
             adc_values = self.ADC.ADS1263_GetAll(channel_list)
-            
-            # Convert ADC values to actual measurements
+
             measurements = {}
             for sensor_name, channel in ADC_PINS.items():
-                adc_value = adc_values[channel]
-                if adc_value >> 31 == 1:  # Negative value
-                    voltage = -(REF * 2 - adc_value * REF / 0x80000000)
-                else:  # Positive value
-                    voltage = adc_value * REF / 0x7fffffff
-                
-                # Convert voltage to current based on sensor specifications
+                raw = adc_values[channel]
+
+                # Convert unsigned to signed 32-bit
+                if raw & 0x80000000:
+                    signed = raw - 0x100000000
+                else:
+                    signed = raw
+
+                # Scale to voltage
+                voltage = signed * REF / 0x7FFFFFFF
+
+                # Convert voltage to current
                 if sensor_name == "DRILL":
-                    current = voltage / 0.020  # 20mV/A
+                    current = voltage / 0.020  # 20 mV/A
                 elif sensor_name == "POWER":
-                    current = voltage / 0.100  # 100mV/A
+                    current = voltage / 0.100  # 100 mV/A
                 elif sensor_name == "LINEAR":
-                    current = voltage / 0.1875  # 187.5mV/A
+                    current = voltage / 0.1875  # 187.5 mV/A
                 elif sensor_name == "VIN":
-                    current = voltage  # This is actually voltage, not current
-                
+                    current = voltage  # direct voltage reading
+
                 measurements[sensor_name] = current
-            
+
             return measurements
         except Exception as e:
             print(f"Sensor read error: {e}")
             return None
+
 
     def on_message(self, client, userdata, msg):
         try:
