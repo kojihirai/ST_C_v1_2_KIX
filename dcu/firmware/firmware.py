@@ -144,6 +144,8 @@ class MotorController:
         )
         if not self.torque_sensor.connected:
             self.send_error("Torque sensor failed to connect")
+        
+        self.state_lock = threading.Lock()
 
         # Threads
         self.running = True
@@ -169,21 +171,30 @@ class MotorController:
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
-            self.mode = Mode(data.get("mode", 0))
-            self.direction = Direction(data.get("direction", 0))
-            self.target = data.get("target", 50)
-            self.duration = data.get("duration", 0)
-            self.pid_setpoint = data.get("pid_setpoint", 0)
-            self.project_id = data.get("project_id", 0)
-            self.experiment_id = data.get("experiment_id", 0)
-            self.run_id = data.get("run_id", 0)
+            with self.state_lock:
+                if "mode" in data:
+                    self.mode = Mode(data["mode"])
+                if "direction" in data:
+                    self.direction = Direction(data["direction"])
+                if "target" in data:
+                    self.target = data["target"]
+                if "duration" in data:
+                    self.duration = data["duration"]
+                if "pid_setpoint" in data:
+                    self.pid_setpoint = data["pid_setpoint"]
+                if "project_id" in data:
+                    self.project_id = data["project_id"]
+                if "experiment_id" in data:
+                    self.experiment_id = data["experiment_id"]
+                if "run_id" in data:
+                    self.run_id = data["run_id"]
             print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}, Speed={self.target}, Setpoint={self.pid_setpoint}")
         except Exception as e:
             self.send_error(f"MQTT command error: {e}")
 
-    def set_motor(self, value):
+    def set_motor(self, value, direction):
         pwm_val = int(min(max(abs(value), 0), 100) * 2.55)
-        forward = value >= 0 if self.direction == Direction.CW else value < 0
+        forward = value >= 0 if direction == Direction.CW else value < 0
         if forward:
             self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], pwm_val)
             self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], 0)
@@ -197,13 +208,19 @@ class MotorController:
 
     def run(self):
         while self.running:
+            with self.state_lock:
+                mode = self.mode
+                dir = self.direction
+                targ = self.target
+
+
             self.read_sensors()
 
-            if self.mode == Mode.IDLE:
+            if mode == Mode.IDLE:
                 self.stop_motor()
 
-            elif self.mode == Mode.RUN_CONTINUOUS:
-                self.set_motor(self.target)
+            elif mode == Mode.RUN_CONTINUOUS:
+                self.set_motor(targ, dir)
             
             else:
                 pass
