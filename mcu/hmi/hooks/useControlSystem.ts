@@ -304,13 +304,14 @@ export function useControlSystem() {
     if (systemStatus === "stopped" && (command === LcuCommand.pid_speed || command === DcuCommand.run_cont)) {
       // Only send both commands if this is the first command being sent
       if (unit === "lcu") {
+        // Format LCU command exactly like DCU command
         const lcuCommand = {
           device: "lcu",
           command: {
             mode: LcuCommand.pid_speed,
             direction: lcuDirection,
             target: lcuTarget,
-            pid_setpoint: lcuTarget,
+            pid_setpoint: 0,
             duration: 0,
             project_id: selectedProjectId || 0,
             experiment_id: selectedExperiment || 0,
@@ -338,14 +339,14 @@ export function useControlSystem() {
     
     // Otherwise only send the command for the changed unit
     if (unit === changedUnit) {
-      // Force correct modes for each unit
+      // Format command exactly like DCU command
       const commandPayload = {
         device: unit,
         command: {
           mode: unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont,
           direction: params.direction ?? 0,
           target: params.target ?? 0,
-          pid_setpoint: unit === "lcu" ? params.target ?? 0 : 0,
+          pid_setpoint: 0,
           duration: 0,
           project_id: selectedProjectId || 0,
           experiment_id: selectedExperiment || 0,
