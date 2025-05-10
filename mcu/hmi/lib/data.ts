@@ -200,7 +200,7 @@ export async function createRun(projectId: string, experimentId: string, name: s
 
 export async function stopRun(projectId: string, experimentId: string, runId: string, status: string = "completed", notes: string = ""): Promise<void> {
   try {
-    await apiStopRun(parseInt(runId), { status, notes });
+    await apiStopRun(parseInt(projectId), parseInt(experimentId), parseInt(runId), { status, notes });
   } catch (error) {
     console.error(`Error stopping run ${runId}:`, error);
     throw error;
