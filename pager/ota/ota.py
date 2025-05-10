@@ -7,7 +7,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # PagerDuty API configuration
-PAGERDUTY_API_TOKEN = os.getenv('PAGERDUTY_API_TOKEN')
+PAGERDUTY_API_TOKEN = 'fb7168b8f0c74f0ac0b7ca3daaf80e3f'
 PAGERDUTY_API_URL = 'https://api.pagerduty.com/incidents'
 
 def create_pagerduty_incident(title, description, urgency='high', priority='P1'):
