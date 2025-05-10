@@ -271,13 +271,25 @@ class MotorSystem:
                 dir = self.direction
                 targ = self.target
 
+            # Store current mode and parameters if we need to return to them after homing
+            if not self.is_homed and mode != Mode.HOMING and mode != Mode.IDLE:
+                stored_mode = mode
+                stored_dir = dir
+                stored_targ = targ
+                self.mode = Mode.HOMING
+                mode = Mode.HOMING
+
             if mode == Mode.HOMING:
                 self._do_homing()
+                # If homing was successful and we have a stored mode, return to it
+                if self.is_homed and 'stored_mode' in locals():
+                    self.mode = stored_mode
+                    self.direction = stored_dir
+                    self.target = stored_targ
+                    mode = stored_mode
+                    print(f"Returning to mode: {mode.name}")
 
             elif mode == Mode.PID_SPEED:
-                if not self.is_homed:
-                    print("ERROR: Not homed")
-                    self._do_homing()
                 if now - self.last_pid_update >= PID_UPDATE_INTERVAL:
                     ref = targ if dir == Direction.FW else -targ
                     out = self.speed_pid.compute(ref, self.current_speed)
