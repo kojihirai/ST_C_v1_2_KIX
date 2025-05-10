@@ -18,21 +18,16 @@ def create_pagerduty_incident(title, description, urgency='high', priority='P1')
     }
     
     payload = {
-        'incident': {
-            'type': 'incident',
-            'title': title,
-            'urgency': urgency,
-            'priority': {
-                'id': priority
-            },
-            'body': {
-                'type': 'incident_body',
-                'details': description
-            },
-            'service': {
-                'id': os.getenv('PAGERDUTY_SERVICE_ID')  # Service ID from environment variable
-            }
-        }
+        'payload': {
+            'summary': title,
+            'severity': urgency,
+            'source': 'OTA System',
+            'custom_details': description
+        },
+        'routing_key': os.getenv('PAGERDUTY_ROUTING_KEY', PAGERDUTY_API_TOKEN),  # Use routing key or fallback to API token
+        'event_action': 'trigger',
+        'client': 'OTA System',
+        'client_url': 'http://localhost:1215'
     }
     
     try:
@@ -40,6 +35,7 @@ def create_pagerduty_incident(title, description, urgency='high', priority='P1')
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
+        print(f"Error details: {e.response.text if hasattr(e, 'response') else str(e)}")
         return {'error': str(e)}
 
 @app.route('/')
