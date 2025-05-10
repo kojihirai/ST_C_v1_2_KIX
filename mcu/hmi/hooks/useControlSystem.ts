@@ -278,8 +278,12 @@ export function useControlSystem() {
 
     try {
       // Send idle commands to both LCU and DCU
-      await sendCommand("lcu", LcuCommand.idle, {});
-      await sendCommand("dcu", DcuCommand.idle, {});
+      await sendCommand("lcu", LcuCommand.idle, {})
+      await sendCommand("dcu", DcuCommand.idle, {})
+      
+      // Reset modes to idle
+      setLcuMode("idle")
+      setDcuMode("idle")
       
       // Only try to end the run if we have a currentRunId
       if (currentRunId) {
@@ -299,8 +303,6 @@ export function useControlSystem() {
       
       // Always update the UI state
       setSystemStatus("stopped");
-      setLcuMode("idle");
-      setDcuMode("idle");
       console.log("Experiment stopped successfully");
     } catch (error) {
       console.error("Error stopping experiment:", error);
@@ -323,6 +325,9 @@ export function useControlSystem() {
       // Send idle commands to both LCU and DCU
       await sendCommand("lcu", LcuCommand.idle, {})
       await sendCommand("dcu", DcuCommand.idle, {})
+      // Reset modes to idle
+      setLcuMode("idle")
+      setDcuMode("idle")
       setSystemStatus("stopped")
     } catch (error) {
       console.error("Error stopping manual:", error)
@@ -384,21 +389,41 @@ export function useControlSystem() {
   // Track which unit changed
   const [changedUnit, setChangedUnit] = useState<"lcu" | "dcu" | null>(null)
 
-  // Update changedUnit when LCU or DCU values change
+  // Update changedUnit and auto-set modes when LCU or DCU values change
   useEffect(() => {
     if (lcuMode !== "idle" || lcuTarget !== 0 || lcuDirection !== LcuDirection.idle) {
       setChangedUnit("lcu")
+      // Auto-set LCU mode to pid_speed when values change
+      if (lcuMode === "idle") {
+        setLcuMode("pid_speed")
+      }
     }
   }, [lcuMode, lcuTarget, lcuDirection])
 
   useEffect(() => {
     if (dcuMode !== "idle" || dcuTarget !== 0 || dcuDirection !== DcuDirection.idle) {
       setChangedUnit("dcu")
+      // Auto-set DCU mode to run_cont when values change
+      if (dcuMode === "idle") {
+        setDcuMode("run_cont")
+      }
     }
   }, [dcuMode, dcuTarget, dcuDirection])
 
   // Only send command for the changed unit
   const executeCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
+    // Handle stop/idle commands
+    if (command === LcuCommand.idle || command === DcuCommand.idle) {
+      if (unit === "lcu") {
+        setLcuMode("idle")
+        await sendCommand("lcu", LcuCommand.idle, {})
+      } else {
+        setDcuMode("idle")
+        await sendCommand("dcu", DcuCommand.idle, {})
+      }
+      return
+    }
+
     // Always send both commands during start operations
     if (systemStatus === "stopped" && (command === LcuCommand.run_cont || command === DcuCommand.run_cont)) {
       // Only send both commands if this is the first command being sent
