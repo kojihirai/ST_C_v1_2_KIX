@@ -38,9 +38,7 @@ def send_pagerduty_alert(title, description, urgency='high', priority='P1'):
             }
         },
         'routing_key': PAGERDUTY_ROUTING_KEY,
-        'event_action': 'trigger',
-        'client': 'Pager OTA Service',
-        'client_url': 'http://localhost:1215'
+        'event_action': 'trigger'
     }
 
     try:
@@ -48,16 +46,9 @@ def send_pagerduty_alert(title, description, urgency='high', priority='P1'):
         response.raise_for_status()
         print(f"PagerDuty alert sent successfully: {response.json()}")
         return response.json()
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Failed to send PagerDuty alert: {str(e)}"
-        if hasattr(e, 'response') and e.response is not None:
-            error_msg += f"\nResponse: {e.response.text}"
-        print(error_msg)
-        return {'error': error_msg}
     except Exception as e:
-        error_msg = f"Unexpected error sending PagerDuty alert: {str(e)}"
-        print(error_msg)
-        return {'error': error_msg}
+        print(f"Failed to send PagerDuty alert: {str(e)}")
+        return {'error': str(e)}
 
 def background_status_check():
     while True:
