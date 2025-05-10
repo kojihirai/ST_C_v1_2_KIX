@@ -268,9 +268,7 @@ export const updateExperiment = async (projectId: number, experimentId: number, 
 };
 
 // Run API
-export const createRun = async (data: {
-  project_id: number;
-  experiment_id: number;
+export const createRun = async (projectId: number, experimentId: number, data: {
   run_name: string;
   run_description?: string;
   run_params?: RunParams;
@@ -278,7 +276,10 @@ export const createRun = async (data: {
   start_time?: string;
   stop_time?: string;
 }): Promise<Run> => {
-  const response = await axiosInstance.post('/runs', data);
+  const response = await axiosInstance.post(
+    `/projects/${projectId}/experiments/${experimentId}/runs`,
+    data
+  );
   return response.data;
 };
 

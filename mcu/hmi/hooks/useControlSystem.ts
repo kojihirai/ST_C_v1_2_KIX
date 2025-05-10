@@ -229,8 +229,20 @@ export function useControlSystem() {
       
       // Create a new run in the database
       console.log("Creating run in database...");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const runResponse = await (apiClient.createRun as any)(selectedProjectId, selectedExperiment);
+      const runResponse = await apiClient.createRun(
+        selectedProjectId,
+        selectedExperiment,
+        {
+          run_name: `Run ${new Date().toISOString()}`,
+          run_status: "running",
+          run_params: {
+            lcu_target: lcuTarget,
+            lcu_direction: lcuDirection,
+            dcu_target: dcuTarget,
+            dcu_direction: dcuDirection
+          }
+        }
+      );
       console.log("Run creation response:", runResponse);
 
       if (runResponse.run_id) {
