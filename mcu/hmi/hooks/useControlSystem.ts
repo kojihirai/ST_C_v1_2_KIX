@@ -243,6 +243,7 @@ export function useControlSystem() {
       let validatedParams = { ...params }
       
       if (unit === "lcu") {
+        console.log("LCU command before validation:", { command, params });
         // For LCU, validate target based on mode
         if (command === LcuCommand.pid_speed) {
           validatedParams.target = Math.max(0, params.target ?? 0)
@@ -250,6 +251,7 @@ export function useControlSystem() {
         } else {
           validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 100)
         }
+        console.log("LCU params after validation:", validatedParams);
       } else if (unit === "dcu") {
         // For DCU, always use run_cont mode
         validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 24)
@@ -270,9 +272,9 @@ export function useControlSystem() {
         }
       }
 
-      console.log(`Sending ${unit} command:`, commandPayload)
+      console.log(`Sending ${unit} command payload:`, JSON.stringify(commandPayload, null, 2))
       const response = await (apiClient.sendCommand as any)(commandPayload)
-      console.log(`${unit} command response:`, response)
+      console.log(`${unit} command response:`, JSON.stringify(response, null, 2))
 
       if (!response.success) {
         console.error(`Failed to send ${unit} command:`, response.message)
@@ -293,9 +295,12 @@ export function useControlSystem() {
   const executeCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
     if (isSendingCommand) return; // Prevent multiple simultaneous sends
 
+    console.log(`Executing ${unit} command:`, { command, params });
+
     // Handle stop/idle commands
     if (command === LcuCommand.idle || command === DcuCommand.idle) {
       if (unit === "lcu") {
+        console.log("Sending LCU idle command");
         setLcuMode("idle")
         await sendCommand("lcu", LcuCommand.idle, {})
       } else {
@@ -309,6 +314,7 @@ export function useControlSystem() {
     if (systemStatus === "stopped" && (command === LcuCommand.pid_speed || command === DcuCommand.run_cont)) {
       // Only send both commands if this is the first command being sent
       if (unit === "lcu") {
+        console.log("Preparing to send initial LCU and DCU commands");
         // Format LCU command
         const lcuCommand = {
           device: "lcu",
@@ -323,6 +329,7 @@ export function useControlSystem() {
             run_id: currentRunId || 0
           }
         }
+        console.log("Initial LCU command payload:", JSON.stringify(lcuCommand, null, 2));
         const dcuCommand = {
           device: "dcu",
           command: {
@@ -336,7 +343,9 @@ export function useControlSystem() {
             run_id: currentRunId || 0
           }
         }
+        console.log("Sending initial LCU command...");
         await (apiClient.sendCommand as any)(lcuCommand)
+        console.log("Sending initial DCU command...");
         await (apiClient.sendCommand as any)(dcuCommand)
       }
       return
@@ -344,6 +353,7 @@ export function useControlSystem() {
     
     // Otherwise only send the command for the changed unit
     if (unit === changedUnit) {
+      console.log(`Sending command for changed unit: ${unit}`);
       // Format command based on unit type
       const commandPayload = {
         device: unit,
@@ -358,6 +368,7 @@ export function useControlSystem() {
           run_id: currentRunId || 0
         }
       }
+      console.log(`${unit} command payload:`, JSON.stringify(commandPayload, null, 2));
       await (apiClient.sendCommand as any)(commandPayload)
     }
   }
