@@ -181,7 +181,7 @@ mqtt_client.loop_start()
 @app.post("/send_command/")
 async def send_command(payload: CommandRequest):
     if payload.device not in expected_devices:
-        return {"error": "Invalid device"}
+        return {"success": False, "message": "Invalid device"}
 
     command_with_ids = {
         **payload.command,
@@ -191,7 +191,7 @@ async def send_command(payload: CommandRequest):
     }
 
     mqtt_client.publish(f"{payload.device}/cmd", json.dumps(command_with_ids))
-    return {"message": f"Command sent to {payload.device}"}
+    return {"success": True, "message": f"Command sent to {payload.device}"}
 
 # --- Projects ---
 

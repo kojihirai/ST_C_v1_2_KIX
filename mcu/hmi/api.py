@@ -69,7 +69,6 @@ class RunVideoCreate(BaseModel):
 
 app = FastAPI()
 
-# Allow all origins for development - in production, you should restrict this
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -77,7 +76,6 @@ origins = [
     "http://127.0.0.1:3001",
     "http://mcu.local:3001",
     "http://10.147.18.184:3001",
-    "http://10.147.18.184:8000",
     "http://192.168.2.1:3001",
     "http://102.168.2.10:3001",
     "*"  # Allow all for testing
@@ -146,7 +144,7 @@ async def websocket_endpoint(websocket: WebSocket, db=Depends(get_db)):
 @app.post("/send_command/")
 async def send_command(payload: CommandRequest):
     if payload.device not in expected_devices:
-        return {"error": "Invalid device"}
+        return {"success": False, "message": "Invalid device"}
 
     command_with_ids = {
         **payload.command,
@@ -156,7 +154,7 @@ async def send_command(payload: CommandRequest):
     }
 
     # mqtt_client.publish(f"{payload.device}/cmd", json.dumps(command_with_ids))
-    return {"message": f"Command sent to {payload.device}"}
+    return {"success": True, "message": f"Command sent to {payload.device}"}
 
 # --- Projects ---
 
