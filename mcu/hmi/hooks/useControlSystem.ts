@@ -243,8 +243,13 @@ export function useControlSystem() {
       let validatedParams = { ...params }
       
       if (unit === "lcu") {
-        // For LCU, always use pid_speed mode
-        validatedParams.pid_setpoint = Math.max(0, params.target ?? 0)
+        // For LCU, validate target based on mode
+        if (command === LcuCommand.pid_speed) {
+          validatedParams.target = Math.max(0, params.target ?? 0)
+          validatedParams.pid_setpoint = validatedParams.target // Set pid_setpoint equal to target for LCU
+        } else {
+          validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 100)
+        }
       } else if (unit === "dcu") {
         // For DCU, always use run_cont mode
         validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 24)
@@ -254,7 +259,7 @@ export function useControlSystem() {
       const commandPayload = {
         device: unit,
         command: {
-          mode: unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont, // Force correct modes
+          mode: command,
           direction: validatedParams.direction ?? 0,
           target: validatedParams.target ?? 0,
           pid_setpoint: validatedParams.pid_setpoint ?? 0,
@@ -304,14 +309,14 @@ export function useControlSystem() {
     if (systemStatus === "stopped" && (command === LcuCommand.pid_speed || command === DcuCommand.run_cont)) {
       // Only send both commands if this is the first command being sent
       if (unit === "lcu") {
-        // Format LCU command exactly like DCU command
+        // Format LCU command
         const lcuCommand = {
           device: "lcu",
           command: {
             mode: LcuCommand.pid_speed,
             direction: lcuDirection,
             target: lcuTarget,
-            pid_setpoint: 0,
+            pid_setpoint: lcuTarget, // Set pid_setpoint equal to target for LCU
             duration: 0,
             project_id: selectedProjectId || 0,
             experiment_id: selectedExperiment || 0,
@@ -339,14 +344,14 @@ export function useControlSystem() {
     
     // Otherwise only send the command for the changed unit
     if (unit === changedUnit) {
-      // Format command exactly like DCU command
+      // Format command based on unit type
       const commandPayload = {
         device: unit,
         command: {
-          mode: unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont,
+          mode: command,
           direction: params.direction ?? 0,
           target: params.target ?? 0,
-          pid_setpoint: 0,
+          pid_setpoint: unit === "lcu" ? params.target ?? 0 : 0, // Set pid_setpoint equal to target for LCU
           duration: 0,
           project_id: selectedProjectId || 0,
           experiment_id: selectedExperiment || 0,
