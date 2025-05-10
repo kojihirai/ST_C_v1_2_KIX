@@ -54,9 +54,9 @@ class ExperimentCreate(BaseModel):
 
 class RunCreate(BaseModel):
     run_name: str
-    run_description: Optional[str]
-    run_params: Optional[dict]
     run_status: str
+    run_description: Optional[str] = None
+    run_params: Optional[dict] = None
     start_time: Optional[datetime] = None
     stop_time: Optional[datetime] = None
 
