@@ -264,16 +264,14 @@ export function useControlSystem() {
         }
       }
 
-      // Format command to match what the API and firmware expect
+      // Format command to match what the LCU/DCU expect
       const commandPayload = {
         device: unit,
-        command: {
-          mode: command,
-          direction: validatedParams.direction ?? 0,
-          target: validatedParams.target ?? 0,
-          pid_setpoint: validatedParams.pid_setpoint ?? 0,
-          duration: validatedParams.duration ?? 0
-        }
+        mode: command,
+        direction: validatedParams.direction ?? 0,
+        target: validatedParams.target ?? 0,
+        pid_setpoint: validatedParams.pid_setpoint ?? 0,
+        duration: validatedParams.duration ?? 0,
       }
 
       console.log(`Sending ${unit} command:`, commandPayload)
