@@ -356,7 +356,7 @@ export const sendCommand = async (data: {
 }): Promise<CommandResponse> => {
   try {
     console.log(`Sending ${data.device} command:`, data)
-    const response = await axiosInstance.post(`${API_BASE_URL}/send_command/`, data)
+    const response = await axiosInstance.post('/send_command/', data)
     console.log(`${data.device} command response:`, response.data)
     return response.data
   } catch (error) {
