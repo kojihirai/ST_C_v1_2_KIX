@@ -218,10 +218,8 @@ export function useControlSystem() {
 
     if (lcuMode !== "idle" || lcuTarget !== 0 || lcuDirection !== LcuDirection.idle) {
       setChangedUnit("lcu")
-      // Auto-set LCU mode to pid_speed when values change
-      if (lcuMode === "idle") {
-        setLcuMode("pid_speed")
-      }
+      // Always set LCU mode to pid_speed
+      setLcuMode("pid_speed")
     }
   }, [lcuMode, lcuTarget, lcuDirection, isSendingCommand])
 
@@ -230,10 +228,8 @@ export function useControlSystem() {
 
     if (dcuMode !== "idle" || dcuTarget !== 0 || dcuDirection !== DcuDirection.idle) {
       setChangedUnit("dcu")
-      // Auto-set DCU mode to run_cont when values change
-      if (dcuMode === "idle") {
-        setDcuMode("run_cont")
-      }
+      // Always set DCU mode to run_cont
+      setDcuMode("run_cont")
     }
   }, [dcuMode, dcuTarget, dcuDirection, isSendingCommand])
 
@@ -247,27 +243,17 @@ export function useControlSystem() {
       let validatedParams = { ...params }
       
       if (unit === "lcu") {
-        if (command === LcuCommand.pid_speed) {
-          // For PID speed mode, ensure target is in mm/s
-          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
-        } else if (command === LcuCommand.run_cont || command === LcuCommand.run_dur) {
-          // For run modes, ensure target is duty cycle percentage (0-100)
-          validatedParams.target = Math.min(Math.max(params.target, 0), 100)
-        }
+        // For LCU, always use pid_speed mode
+        validatedParams.pid_setpoint = Math.max(0, params.target ?? 0)
       } else if (unit === "dcu") {
-        if (command === DcuCommand.pid_speed) {
-          // For PID speed mode, ensure target is in RPM
-          validatedParams.pid_setpoint = Math.max(0, params.pid_setpoint)
-        } else if (command === DcuCommand.run_cont || command === DcuCommand.run_dur) {
-          // For run modes, ensure target is voltage (0-24V)
-          validatedParams.target = Math.min(Math.max(params.target, 0), 24)
-        }
+        // For DCU, always use run_cont mode
+        validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 24)
       }
 
       // Format command to match what the LCU/DCU expect
       const commandPayload = {
         device: unit,
-        mode: command,
+        mode: unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont, // Force correct modes
         direction: validatedParams.direction ?? 0,
         target: validatedParams.target ?? 0,
         pid_setpoint: validatedParams.pid_setpoint ?? 0,
@@ -321,7 +307,7 @@ export function useControlSystem() {
     
     // Otherwise only send the command for the changed unit
     if (unit === changedUnit) {
-      // Ensure LCU uses pid_speed and DCU uses run_cont
+      // Force correct modes for each unit
       const finalCommand = unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont;
       await sendCommand(unit, finalCommand, params)
     }
