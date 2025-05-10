@@ -345,16 +345,23 @@ export const getVideosByRun = async (runId: number): Promise<RunVideo[]> => {
 // Control System API
 export const sendCommand = async (command: Command): Promise<CommandResponse> => {
   try {
+    console.log('Sending command to API:', command);
     const response = await axiosInstance.post('/send_command/', command);
-    return {
+    console.log('API response:', response.data);
+    
+    const result = {
       success: response.data.success,
       message: response.data.message
     };
+    console.log('Processed response:', result);
+    return result;
   } catch (error) {
     console.error('Error sending command:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Error details:', errorMessage);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error occurred'
+      message: errorMessage
     };
   }
 };

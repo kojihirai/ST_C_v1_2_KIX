@@ -366,12 +366,18 @@ export function useControlSystem() {
 
       console.log(`Sending ${unit} command:`, commandPayload)
       const response = await (apiClient.sendCommand as any)(commandPayload)
+      console.log(`${unit} command response:`, response)
 
       if (!response.success) {
-        console.error(`Failed to send ${unit} command:`, (response as any).message)
+        console.error(`Failed to send ${unit} command:`, response.message)
+        return false
       }
+
+      console.log(`Successfully sent ${unit} command:`, response.message)
+      return true
     } catch (error) {
       console.error(`Error sending ${unit} command:`, error)
+      return false
     }
   }
 
