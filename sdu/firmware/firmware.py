@@ -18,8 +18,8 @@ import ADS1263
 # === Config ===
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
-REF = 5.0  # ADC reference voltage
-VOLTAGE_SCALE = 24.0 / 5.0  # Scale factor: 24V actual / 5V ADC full scale
+REF = 5.08
+VOLTAGE_SCALE = 24.0 / 5.0
 
 ADC_PINS = {
     "DRILL": 0,
@@ -79,7 +79,7 @@ class SensorController:
                     signed = raw - 0x100000000
                 else:
                     signed = raw
-                    
+
                 voltage = signed * REF / 0x7FFFFFFF
 
                 # Convert voltage to current
