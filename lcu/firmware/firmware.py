@@ -242,24 +242,18 @@ class MotorSystem:
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
-            with self.state_lock:
-                if 'mode' in data:
-                    self.mode = Mode(data['mode'])
-                if 'direction' in data:
-                    self.direction = Direction(data['direction'])
-                if 'target' in data:
-                    self.target = float(data['target'])
-                if 'pid_setpoint' in data:
-                    self.pid_setpoint = float(data['pid_setpoint'])
-                if 'experiment_id' in data:
-                    self.experiment_id = int(data['experiment_id'])
-                if 'run_id' in data:
-                    self.run_id = int(data['run_id'])
-                if 'project_id' in data:
-                    self.project_id = int(data['project_id'])
-            print(f"Received command: mode={self.mode}, direction={self.direction}, target={self.target}, setpoint={self.pid_setpoint}")
+            self.mode = Mode(data.get("mode", 0))
+            self.direction = Direction(data.get("direction", 0))
+            self.target = data.get("target", 50)
+            self.duration = data.get("duration", 0)
+            self.pid_setpoint = data.get("pid_setpoint", 0)
+            self.project_id = data.get("project_id", 0)
+            self.experiment_id = data.get("experiment_id", 0)
+            self.run_id = data.get("run_id", 0)
+            print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}, Speed={self.target}, Setpoint={self.pid_setpoint}")
         except Exception as e:
-            print(f"MQTT command error: {e}")
+            self.send_error(f"MQTT command error: {e}")
+
 
     def run_loop(self):
         while self.running:
