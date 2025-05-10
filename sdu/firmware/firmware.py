@@ -16,7 +16,7 @@ import RPi.GPIO as GPIO
 import ADS1263
 
 # === Config ===
-BROKER_IP = "192.168.2.4"
+BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
 REF = 5.08  # Reference voltage for ADC
 
