@@ -345,14 +345,16 @@ export const getVideosByRun = async (runId: number): Promise<RunVideo[]> => {
 // Control System API
 export const sendCommand = async (data: {
   device: "lcu" | "dcu",
-  mode: number,
-  direction: number,
-  target: number,
-  pid_setpoint?: number,
-  duration?: number,
-  project_id?: number,
-  experiment_id?: number,
-  run_id?: number
+  command: {
+    mode: number,
+    direction: number,
+    target: number,
+    pid_setpoint?: number,
+    duration?: number,
+    project_id?: number,
+    experiment_id?: number,
+    run_id?: number
+  }
 }): Promise<CommandResponse> => {
   try {
     console.log(`Sending ${data.device} command:`, data)

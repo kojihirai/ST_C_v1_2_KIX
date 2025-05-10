@@ -250,14 +250,19 @@ export function useControlSystem() {
         validatedParams.target = Math.min(Math.max(params.target ?? 0, 0), 24)
       }
 
-      // Format command to match what the LCU/DCU expect
+      // Format command to match what the API expects
       const commandPayload = {
         device: unit,
-        mode: unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont, // Force correct modes
-        direction: validatedParams.direction ?? 0,
-        target: validatedParams.target ?? 0,
-        pid_setpoint: validatedParams.pid_setpoint ?? 0,
-        duration: validatedParams.duration ?? 0,
+        command: {
+          mode: unit === "lcu" ? LcuCommand.pid_speed : DcuCommand.run_cont, // Force correct modes
+          direction: validatedParams.direction ?? 0,
+          target: validatedParams.target ?? 0,
+          pid_setpoint: validatedParams.pid_setpoint ?? 0,
+          duration: validatedParams.duration ?? 0,
+          project_id: selectedProjectId || 0,
+          experiment_id: selectedExperiment || 0,
+          run_id: currentRunId || 0
+        }
       }
 
       console.log(`Sending ${unit} command:`, commandPayload)
