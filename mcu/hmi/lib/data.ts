@@ -183,12 +183,15 @@ export async function deleteRun(): Promise<void> {
 
 export async function createRun(projectId: string, experimentId: string, name: string): Promise<Run> {
   try {
-    return await apiCreateRun({
-      project_id: parseInt(projectId),
-      experiment_id: parseInt(experimentId),
-      run_name: name,
-      run_status: "pending"
-    });
+    return await apiCreateRun(
+      parseInt(projectId),
+      parseInt(experimentId),
+      {
+        run_name: name,
+        run_status: "running",
+        run_params: {}
+      }
+    );
   } catch (error) {
     console.error("Error creating run:", error);
     throw error;
