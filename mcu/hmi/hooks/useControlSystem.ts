@@ -353,16 +353,21 @@ export function useControlSystem() {
       }
 
       const commandPayload = {
-        unit,
-        command,
-        params: validatedParams,
-        project_id: selectedProjectId,
-        experiment_id: selectedExperiment,
-        run_id: currentRunId
+        device: unit,
+        command: {
+          mode: command,
+          direction: validatedParams.direction ?? 0,
+          pid_setpoint: validatedParams.pid_setpoint ?? 0,
+          duration: validatedParams.duration ?? 0,
+          target: validatedParams.target ?? 0,
+          project_id: selectedProjectId,
+          experiment_id: selectedExperiment,
+          run_id: currentRunId
+        }
       }
 
       console.log(`Sending ${unit} command:`, commandPayload)
-      const response = await (apiClient.sendCommand as any)(unit, commandPayload)
+      const response = await (apiClient.sendCommand as any)(commandPayload)
 
       if (!response.success) {
         console.error(`Failed to send ${unit} command:`, (response as any).message)
