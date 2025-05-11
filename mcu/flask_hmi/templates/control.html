@@ -3,7 +3,76 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <h1 class="mb-4">Control Panel</h1>
+        <div class="system-status" id="systemStatus">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-activity" id="statusIcon"></i>
+                <span class="ms-2" id="statusText">System Status: STOPPED</span>
+            </div>
+            <div class="d-flex align-items-center ms-auto">
+                <button class="btn btn-danger ms-2" onclick="emergencyStop()">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Emergency Stop
+                </button>
+                <span class="badge ms-2" id="modeBadge">Manual Mode</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>SANDTROUT SYSTEM v1</h1>
+            <div class="d-flex gap-2">
+                <button class="btn" id="startStopButton" onclick="toggleManualMode()">
+                    START MANUAL
+                </button>
+                <span class="badge" id="statusBadge">⚪ Stopped</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="control-panel">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label class="form-label">Mode</label>
+                        <select class="form-select" id="modeSelect" onchange="setMode(this.value)">
+                            <option value="manual">Manual Mode</option>
+                            <option value="experiment">Experiment Mode</option>
+                            <option value="program">Program Mode</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Project</label>
+                        <select class="form-select" id="projectSelect" onchange="setProject(this.value)">
+                            <option value="">Select Project</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Experiment</label>
+                        <select class="form-select" id="experimentSelect" onchange="setExperiment(this.value)">
+                            <option value="">Select Experiment</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex justify-content-end">
+                        <button class="btn btn-outline-secondary me-2" onclick="resetSystem()">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            Reset
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="window.location.href='/projects'">
+                            <i class="bi bi-gear"></i>
+                            Manage
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -13,24 +82,15 @@
         <div class="control-panel">
             <h3>LCU Control</h3>
             <div class="mb-3">
-                <label class="form-label">Mode</label>
-                <select class="form-select" id="lcu-mode">
-                    <option value="0">Position Control</option>
-                    <option value="1">Speed Control</option>
-                    <option value="2">Current Control</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Position (mm)</label>
-                <input type="number" class="form-control" id="lcu-position" step="0.1">
-            </div>
-            <div class="mb-3">
                 <label class="form-label">Speed (mm/s)</label>
                 <input type="number" class="form-control" id="lcu-speed" step="0.1">
             </div>
             <div class="mb-3">
-                <label class="form-label">Current (A)</label>
-                <input type="number" class="form-control" id="lcu-current" step="0.1">
+                <label class="form-label">Direction</label>
+                <select class="form-select" id="lcu-direction">
+                    <option value="forward">Forward</option>
+                    <option value="reverse">Reverse</option>
+                </select>
             </div>
             <button class="btn btn-primary" onclick="sendLCUCommand()">Send Command</button>
         </div>
@@ -41,68 +101,17 @@
         <div class="control-panel">
             <h3>DCU Control</h3>
             <div class="mb-3">
-                <label class="form-label">Mode</label>
-                <select class="form-select" id="dcu-mode">
-                    <option value="0">Position Control</option>
-                    <option value="1">Speed Control</option>
-                    <option value="2">Current Control</option>
+                <label class="form-label">Voltage (V)</label>
+                <input type="number" class="form-control" id="dcu-voltage" step="0.1">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Direction</label>
+                <select class="form-select" id="dcu-direction">
+                    <option value="forward">Forward</option>
+                    <option value="reverse">Reverse</option>
                 </select>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Position (mm)</label>
-                <input type="number" class="form-control" id="dcu-position" step="0.1">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Speed (mm/s)</label>
-                <input type="number" class="form-control" id="dcu-speed" step="0.1">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Current (A)</label>
-                <input type="number" class="form-control" id="dcu-current" step="0.1">
-            </div>
             <button class="btn btn-primary" onclick="sendDCUCommand()">Send Command</button>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="control-panel">
-            <h3>System Status</h3>
-            <div class="row">
-                <div class="col-md-6">
-                    <h4>LCU Status</h4>
-                    <div id="lcu-status-details">
-                        <p>Mode: <span id="lcu-status-mode">-</span></p>
-                        <p>Position: <span id="lcu-status-position">-</span> mm</p>
-                        <p>Speed: <span id="lcu-status-speed">-</span> mm/s</p>
-                        <p>Current: <span id="lcu-status-current">-</span> A</p>
-                        <p>Load: <span id="lcu-status-load">-</span> %</p>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <h4>DCU Status</h4>
-                    <div id="dcu-status-details">
-                        <p>Mode: <span id="dcu-status-mode">-</span></p>
-                        <p>Position: <span id="dcu-status-position">-</span> mm</p>
-                        <p>Speed: <span id="dcu-status-speed">-</span> mm/s</p>
-                        <p>Current: <span id="dcu-status-current">-</span> A</p>
-                        <p>Load: <span id="dcu-status-load">-</span> %</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="control-panel">
-            <h3>Emergency Controls</h3>
-            <div class="d-grid gap-2">
-                <button class="btn btn-warning" onclick="resetSystem()">Reset System</button>
-                <button class="emergency-button" onclick="emergencyStop()">EMERGENCY STOP</button>
-            </div>
         </div>
     </div>
 </div>
@@ -110,66 +119,195 @@
 
 {% block scripts %}
 <script>
+    let systemStatus = "stopped";
+    let mode = "manual";
+    let selectedProjectId = null;
+    let selectedExperimentId = null;
+
+    // Initialize the page
+    function init() {
+        loadProjects();
+        checkSystemStatus();
+    }
+
+    // Load projects
+    function loadProjects() {
+        axios.get('/api/projects')
+            .then(response => {
+                const projects = response.data;
+                const select = document.getElementById('projectSelect');
+                select.innerHTML = '<option value="">Select Project</option>' +
+                    projects.map(p => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
+            })
+            .catch(error => {
+                console.error('Error loading projects:', error);
+            });
+    }
+
+    // Load experiments for a project
+    function loadExperiments(projectId) {
+        axios.get(`/api/projects/${projectId}/experiments`)
+            .then(response => {
+                const experiments = response.data;
+                const select = document.getElementById('experimentSelect');
+                select.innerHTML = '<option value="">Select Experiment</option>' +
+                    experiments.map(e => `<option value="${e.experiment_id}">${e.experiment_name}</option>`).join('');
+            })
+            .catch(error => {
+                console.error('Error loading experiments:', error);
+            });
+    }
+
+    // Check system status
+    function checkSystemStatus() {
+        axios.get('/api/system_status')
+            .then(response => {
+                const data = response.data;
+                systemStatus = data.status;
+                mode = data.mode;
+                selectedProjectId = data.selected_project_id;
+                selectedExperimentId = data.selected_experiment_id;
+
+                updateUI();
+            })
+            .catch(error => {
+                console.error('Error checking system status:', error);
+            });
+    }
+
+    // Update UI based on system status
+    function updateUI() {
+        // Update status badge
+        const statusBadge = document.getElementById('statusBadge');
+        statusBadge.textContent = systemStatus === "running" ? "🟢 Running" : "⚪ Stopped";
+        statusBadge.className = `badge ${systemStatus === "running" ? "badge-default" : "badge-outline"}`;
+
+        // Update mode badge
+        const modeBadge = document.getElementById('modeBadge');
+        modeBadge.textContent = `${mode.charAt(0).toUpperCase() + mode.slice(1)} Mode`;
+        modeBadge.className = `badge ${mode === "manual" ? "badge-default" : "badge-outline"}`;
+
+        // Update start/stop button
+        const startStopButton = document.getElementById('startStopButton');
+        if (mode === "manual") {
+            startStopButton.textContent = systemStatus === "running" ? "STOP MANUAL" : "START MANUAL";
+            startStopButton.className = `btn ${systemStatus === "running" ? "btn-danger" : "btn-success"}`;
+        } else if (mode === "experiment" && selectedExperimentId) {
+            startStopButton.textContent = systemStatus === "running" ? "STOP EXPERIMENT" : "START EXPERIMENT";
+            startStopButton.className = `btn ${systemStatus === "running" ? "btn-danger" : "btn-success"}`;
+        } else {
+            startStopButton.style.display = "none";
+        }
+
+        // Update system status panel
+        const systemStatusPanel = document.getElementById('systemStatus');
+        systemStatusPanel.className = `system-status ${systemStatus === "running" ? "running" : "stopped"}`;
+    }
+
+    // Toggle manual mode
+    function toggleManualMode() {
+        if (systemStatus === "running") {
+            axios.post('/api/stop_manual')
+                .then(response => {
+                    systemStatus = "stopped";
+                    updateUI();
+                })
+                .catch(error => {
+                    alert('Error stopping manual mode: ' + error.message);
+                });
+        } else {
+            axios.post('/api/start_manual')
+                .then(response => {
+                    systemStatus = "running";
+                    updateUI();
+                })
+                .catch(error => {
+                    alert('Error starting manual mode: ' + error.message);
+                });
+        }
+    }
+
+    // Set mode
+    function setMode(newMode) {
+        axios.post('/api/set_mode', { mode: newMode })
+            .then(response => {
+                mode = newMode;
+                updateUI();
+            })
+            .catch(error => {
+                alert('Error setting mode: ' + error.message);
+            });
+    }
+
+    // Set project
+    function setProject(projectId) {
+        axios.post('/api/set_project', { project_id: projectId })
+            .then(response => {
+                selectedProjectId = projectId;
+                if (projectId) {
+                    loadExperiments(projectId);
+                }
+                updateUI();
+            })
+            .catch(error => {
+                alert('Error setting project: ' + error.message);
+            });
+    }
+
+    // Set experiment
+    function setExperiment(experimentId) {
+        axios.post('/api/set_experiment', { experiment_id: experimentId })
+            .then(response => {
+                selectedExperimentId = experimentId;
+                updateUI();
+            })
+            .catch(error => {
+                alert('Error setting experiment: ' + error.message);
+            });
+    }
+
+    // Send LCU command
     function sendLCUCommand() {
         const command = {
-            mode: parseInt(document.getElementById('lcu-mode').value),
-            position: parseFloat(document.getElementById('lcu-position').value) || 0,
+            mode: "pid_speed",
             speed: parseFloat(document.getElementById('lcu-speed').value) || 0,
-            current: parseFloat(document.getElementById('lcu-current').value) || 0
+            direction: document.getElementById('lcu-direction').value
         };
-
         sendCommand('lcu', command);
     }
 
+    // Send DCU command
     function sendDCUCommand() {
         const command = {
-            mode: parseInt(document.getElementById('dcu-mode').value),
-            position: parseFloat(document.getElementById('dcu-position').value) || 0,
-            speed: parseFloat(document.getElementById('dcu-speed').value) || 0,
-            current: parseFloat(document.getElementById('dcu-current').value) || 0
+            mode: "run_continuous",
+            voltage: parseFloat(document.getElementById('dcu-voltage').value) || 0,
+            direction: document.getElementById('dcu-direction').value
         };
-
         sendCommand('dcu', command);
     }
 
+    // Send command to device
     function sendCommand(device, command) {
         axios.post('/api/send_command', {
             device: device,
             command: command
         })
         .then(response => {
-            alert(`${device.toUpperCase()} command sent successfully`);
+            console.log(`${device.toUpperCase()} command sent successfully`);
         })
         .catch(error => {
             alert(`Error sending ${device.toUpperCase()} command: ${error.message}`);
         });
     }
 
-    function updateDeviceStatus(device, data) {
-        document.getElementById(`${device}-status-mode`).textContent = data.mode;
-        document.getElementById(`${device}-status-position`).textContent = data.position.toFixed(2);
-        document.getElementById(`${device}-status-speed`).textContent = data.speed.toFixed(2);
-        document.getElementById(`${device}-status-current`).textContent = data.current.toFixed(2);
-        document.getElementById(`${device}-status-load`).textContent = data.load.toFixed(2);
-    }
-
-    function checkDeviceStatus() {
-        axios.get('/api/device_status')
-            .then(response => {
-                const data = response.data;
-                updateDeviceStatus('lcu', data.lcu);
-                updateDeviceStatus('dcu', data.dcu);
-            })
-            .catch(error => {
-                console.error('Error checking device status:', error);
-            });
-    }
-
+    // Emergency stop
     function emergencyStop() {
         if (confirm('Are you sure you want to trigger an emergency stop?')) {
             axios.post('/api/emergency_stop')
                 .then(response => {
                     alert('Emergency stop triggered: ' + response.data.message);
+                    systemStatus = "stopped";
+                    updateUI();
                 })
                 .catch(error => {
                     alert('Error triggering emergency stop: ' + error.message);
@@ -177,6 +315,7 @@
         }
     }
 
+    // Reset system
     function resetSystem() {
         if (confirm('Are you sure you want to reset the system?')) {
             axios.post('/api/reset')
@@ -189,8 +328,10 @@
         }
     }
 
+    // Initialize the page
+    init();
+
     // Check status every second
-    setInterval(checkDeviceStatus, 1000);
-    checkDeviceStatus(); // Initial check
+    setInterval(checkSystemStatus, 1000);
 </script>
 {% endblock %} 
