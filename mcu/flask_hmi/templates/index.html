@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">DUNE Control System</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="control-panel">
+            <h3>System Status</h3>
+            <div class="mb-3">
+                <span class="status-indicator status-online" id="lcu-status"></span>
+                <span>LCU Status: <span id="lcu-status-text">Checking...</span></span>
+            </div>
+            <div class="mb-3">
+                <span class="status-indicator status-online" id="dcu-status"></span>
+                <span>DCU Status: <span id="dcu-status-text">Checking...</span></span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="control-panel">
+            <h3>Quick Actions</h3>
+            <div class="d-grid gap-2">
+                <a href="/control" class="btn btn-primary">Go to Control Panel</a>
+                <button class="btn btn-warning" onclick="resetSystem()">Reset System</button>
+                <button class="emergency-button" onclick="emergencyStop()">EMERGENCY STOP</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Check device status periodically
+    function checkDeviceStatus() {
+        axios.get('/api/device_status')
+            .then(response => {
+                const data = response.data;
+                updateDeviceStatus('lcu', data.lcu);
+                updateDeviceStatus('dcu', data.dcu);
+            })
+            .catch(error => {
+                console.error('Error checking device status:', error);
+            });
+    }
+
+    function updateDeviceStatus(device, status) {
+        const statusIndicator = document.getElementById(`${device}-status`);
+        const statusText = document.getElementById(`${device}-status-text`);
+        
+        if (status.online) {
+            statusIndicator.className = 'status-indicator status-online';
+            statusText.textContent = 'Online';
+        } else {
+            statusIndicator.className = 'status-indicator status-offline';
+            statusText.textContent = 'Offline';
+        }
+    }
+
+    function emergencyStop() {
+        if (confirm('Are you sure you want to trigger an emergency stop?')) {
+            axios.post('/api/emergency_stop')
+                .then(response => {
+                    alert('Emergency stop triggered: ' + response.data.message);
+                })
+                .catch(error => {
+                    alert('Error triggering emergency stop: ' + error.message);
+                });
+        }
+    }
+
+    function resetSystem() {
+        if (confirm('Are you sure you want to reset the system?')) {
+            axios.post('/api/reset')
+                .then(response => {
+                    alert('System reset initiated: ' + response.data.message);
+                })
+                .catch(error => {
+                    alert('Error resetting system: ' + error.message);
+                });
+        }
+    }
+
+    // Check status every 5 seconds
+    setInterval(checkDeviceStatus, 5000);
+    checkDeviceStatus(); // Initial check
+</script>
+{% endblock %} 

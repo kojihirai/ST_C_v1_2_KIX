@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Control Panel</h1>
+    </div>
+</div>
+
+<div class="row">
+    <!-- LCU Control Panel -->
+    <div class="col-md-6">
+        <div class="control-panel">
+            <h3>LCU Control</h3>
+            <div class="mb-3">
+                <label class="form-label">Mode</label>
+                <select class="form-select" id="lcu-mode">
+                    <option value="0">Position Control</option>
+                    <option value="1">Speed Control</option>
+                    <option value="2">Current Control</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Position (mm)</label>
+                <input type="number" class="form-control" id="lcu-position" step="0.1">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Speed (mm/s)</label>
+                <input type="number" class="form-control" id="lcu-speed" step="0.1">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Current (A)</label>
+                <input type="number" class="form-control" id="lcu-current" step="0.1">
+            </div>
+            <button class="btn btn-primary" onclick="sendLCUCommand()">Send Command</button>
+        </div>
+    </div>
+
+    <!-- DCU Control Panel -->
+    <div class="col-md-6">
+        <div class="control-panel">
+            <h3>DCU Control</h3>
+            <div class="mb-3">
+                <label class="form-label">Mode</label>
+                <select class="form-select" id="dcu-mode">
+                    <option value="0">Position Control</option>
+                    <option value="1">Speed Control</option>
+                    <option value="2">Current Control</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Position (mm)</label>
+                <input type="number" class="form-control" id="dcu-position" step="0.1">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Speed (mm/s)</label>
+                <input type="number" class="form-control" id="dcu-speed" step="0.1">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Current (A)</label>
+                <input type="number" class="form-control" id="dcu-current" step="0.1">
+            </div>
+            <button class="btn btn-primary" onclick="sendDCUCommand()">Send Command</button>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="control-panel">
+            <h3>System Status</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>LCU Status</h4>
+                    <div id="lcu-status-details">
+                        <p>Mode: <span id="lcu-status-mode">-</span></p>
+                        <p>Position: <span id="lcu-status-position">-</span> mm</p>
+                        <p>Speed: <span id="lcu-status-speed">-</span> mm/s</p>
+                        <p>Current: <span id="lcu-status-current">-</span> A</p>
+                        <p>Load: <span id="lcu-status-load">-</span> %</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h4>DCU Status</h4>
+                    <div id="dcu-status-details">
+                        <p>Mode: <span id="dcu-status-mode">-</span></p>
+                        <p>Position: <span id="dcu-status-position">-</span> mm</p>
+                        <p>Speed: <span id="dcu-status-speed">-</span> mm/s</p>
+                        <p>Current: <span id="dcu-status-current">-</span> A</p>
+                        <p>Load: <span id="dcu-status-load">-</span> %</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="control-panel">
+            <h3>Emergency Controls</h3>
+            <div class="d-grid gap-2">
+                <button class="btn btn-warning" onclick="resetSystem()">Reset System</button>
+                <button class="emergency-button" onclick="emergencyStop()">EMERGENCY STOP</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function sendLCUCommand() {
+        const command = {
+            mode: parseInt(document.getElementById('lcu-mode').value),
+            position: parseFloat(document.getElementById('lcu-position').value) || 0,
+            speed: parseFloat(document.getElementById('lcu-speed').value) || 0,
+            current: parseFloat(document.getElementById('lcu-current').value) || 0
+        };
+
+        sendCommand('lcu', command);
+    }
+
+    function sendDCUCommand() {
+        const command = {
+            mode: parseInt(document.getElementById('dcu-mode').value),
+            position: parseFloat(document.getElementById('dcu-position').value) || 0,
+            speed: parseFloat(document.getElementById('dcu-speed').value) || 0,
+            current: parseFloat(document.getElementById('dcu-current').value) || 0
+        };
+
+        sendCommand('dcu', command);
+    }
+
+    function sendCommand(device, command) {
+        axios.post('/api/send_command', {
+            device: device,
+            command: command
+        })
+        .then(response => {
+            alert(`${device.toUpperCase()} command sent successfully`);
+        })
+        .catch(error => {
+            alert(`Error sending ${device.toUpperCase()} command: ${error.message}`);
+        });
+    }
+
+    function updateDeviceStatus(device, data) {
+        document.getElementById(`${device}-status-mode`).textContent = data.mode;
+        document.getElementById(`${device}-status-position`).textContent = data.position.toFixed(2);
+        document.getElementById(`${device}-status-speed`).textContent = data.speed.toFixed(2);
+        document.getElementById(`${device}-status-current`).textContent = data.current.toFixed(2);
+        document.getElementById(`${device}-status-load`).textContent = data.load.toFixed(2);
+    }
+
+    function checkDeviceStatus() {
+        axios.get('/api/device_status')
+            .then(response => {
+                const data = response.data;
+                updateDeviceStatus('lcu', data.lcu);
+                updateDeviceStatus('dcu', data.dcu);
+            })
+            .catch(error => {
+                console.error('Error checking device status:', error);
+            });
+    }
+
+    function emergencyStop() {
+        if (confirm('Are you sure you want to trigger an emergency stop?')) {
+            axios.post('/api/emergency_stop')
+                .then(response => {
+                    alert('Emergency stop triggered: ' + response.data.message);
+                })
+                .catch(error => {
+                    alert('Error triggering emergency stop: ' + error.message);
+                });
+        }
+    }
+
+    function resetSystem() {
+        if (confirm('Are you sure you want to reset the system?')) {
+            axios.post('/api/reset')
+                .then(response => {
+                    alert('System reset initiated: ' + response.data.message);
+                })
+                .catch(error => {
+                    alert('Error resetting system: ' + error.message);
+                });
+        }
+    }
+
+    // Check status every second
+    setInterval(checkDeviceStatus, 1000);
+    checkDeviceStatus(); // Initial check
+</script>
+{% endblock %} 

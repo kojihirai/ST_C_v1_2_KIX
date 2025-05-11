@@ -567,6 +567,13 @@ async def reset_experiment(project_id: int, experiment_id: int):
         "experiment_id": experiment_id
     }
 
+# --- Device Data ---
+
+@app.get("/device_data")
+def get_device_data():
+    """Get current device data"""
+    return device_data
+
 # --- Startup & Shutdown ---
 
 @app.on_event("startup")
