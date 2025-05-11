@@ -6,8 +6,8 @@ from datetime import datetime
 app = Flask(__name__)
 
 # Configuration
-BACKEND_URL = "http://localhost:8000"  # FastAPI backend URL
-
+# BACKEND_URL = "http://localhost:8000"  # FastAPI backend URL
+BACKEND_URL = "http://10.147.18.184:8000"  # FastAPI backend URL
 # Global state
 system_status = "stopped"
 mode = "manual"  # manual, experiment, program
