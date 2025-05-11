@@ -156,7 +156,7 @@ class WebSocketManager {
 
 // Create and export a singleton instance
 export const websocket = new WebSocketManager({
-  url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws",
-  // url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://10.147.18.184:8000/ws",
+  // url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws",
+  url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://10.147.18.184:8000/ws",
   reconnectInterval: 3000,
 })
