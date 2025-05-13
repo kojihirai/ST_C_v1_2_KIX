@@ -8,7 +8,7 @@ from queue import Queue
 
 import paho.mqtt.client as mqtt
 import pigpio
-from pymodbus.client import ModbusSerialClient  # Re-enabled Modbus
+from pymodbus.client import ModbusSerialClient
 
 # ----------------------------------------------------
 # HighSpeedLogger Class
@@ -65,21 +65,18 @@ class HighSpeedLogger:
 class LoadCell:
     def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
         self.client = ModbusSerialClient(
-            port=port, baudrate=baudrate, parity=parity,
-            stopbits=stopbits, bytesize=bytesize, timeout=timeout
+            port=port,
+            baudrate=baudrate,
+            parity=parity,
+            stopbits=stopbits,
+            bytesize=bytesize,
+            timeout=timeout
         )
         self.slave_id = slave_id
-        try:
-            self.connected = self.client.connect()
-        except Exception as e:
-            print(f"Modbus connect error: {e}")
-            self.connected = False
+        self.connected = self.client.connect()
 
     def __del__(self):
-        try:
-            self.client.close()
-        except:
-            pass
+        self.client.close()
 
     def decode_i32(self, registers):
         raw = (registers[0] << 16) | registers[1]
@@ -89,13 +86,17 @@ class LoadCell:
         result = self.client.read_input_registers(address=4, count=2, slave=self.slave_id)
         if not result.isError():
             return self.decode_i32(result.registers)
-        return None
+        else:
+            print("❌ Failed to read load value")
+            return None
 
     def read_status_flags(self):
         result = self.client.read_discrete_inputs(address=0, count=2, slave=self.slave_id)
         if not result.isError():
-            return result.bits[0], result.bits[1]
-        return None, None
+            return result.bits[0], result.bits[1]  # hold, stable
+        else:
+            print("❌ Failed to read status flags")
+            return None, None
 
 # ----------------------------------------------------
 # PIDController Class
@@ -130,15 +131,18 @@ class PIDController:
         self.prev_derivative = 0.0
         self.last_time = time.monotonic()
 
-
 # ----------------------------------------------------
 # Enums
 # ----------------------------------------------------
 class Mode(Enum):
     IDLE = 0
+    RUN_DURATION = 1
     RUN_CONTINUOUS = 2
+    PID_POSITION = 3
+    PID_CURRENT = 4
+    PID_LOAD = 5
     PID_SPEED = 6
-    HOMING = 8
+    HOMING = 7
 
 class Direction(Enum):
     IDLE = 0
@@ -200,8 +204,13 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-        self.load_cell = LoadCell('/dev/ttyUSB0', 9600, 'E', 1, 8, 1, 1)
-        self.logger = HighSpeedLogger()
+        self.load_cell = LoadCell(port='/dev/ttyUSB0', baudrate=9600, parity='E', stopbits=1, bytesize=8, timeout=1, slave_id=1)
+        # self.logger = HighSpeedLogger()
+
+        # Initialize IDs as integers with default value 0
+        self.project_id = 0
+        self.experiment_id = 0
+        self.run_id = 0
 
         self.running = True
         threading.Thread(target=self.run_loop, daemon=True).start()
@@ -232,19 +241,20 @@ class MotorSystem:
 
     def on_message(self, client, userdata, msg):
         try:
+            print(f"Received: {msg.payload.decode()}")
             data = json.loads(msg.payload.decode())
-            with self.state_lock:
-                if 'mode' in data:
-                    self.mode = Mode(data['mode'])
-                if 'direction' in data:
-                    self.direction = Direction(data['direction'])
-                if 'target' in data:
-                    self.target = float(data['target'])
-                if 'pid_setpoint' in data:
-                    self.pid_setpoint = float(data['pid_setpoint'])
-            print(f"Received command: mode={self.mode}, direction={self.direction}, target={self.target}, setpoint={self.pid_setpoint}")
+            self.mode = Mode(data.get("mode", 0))
+            self.direction = Direction(data.get("direction", 0))
+            self.target = data.get("target", 50)
+            self.duration = data.get("duration", 0)
+            self.pid_setpoint = data.get("pid_setpoint", 0)
+            self.project_id = data.get("project_id", 0)
+            self.experiment_id = data.get("experiment_id", 0)
+            self.run_id = data.get("run_id", 0)
+            print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}, Speed={self.target}, Setpoint={self.pid_setpoint}")
         except Exception as e:
-            print(f"MQTT command error: {e}")
+            self.send_error(f"MQTT command error: {e}")
+
 
     def run_loop(self):
         while self.running:
@@ -261,14 +271,26 @@ class MotorSystem:
                 dir = self.direction
                 targ = self.target
 
+            # Store current mode and parameters if we need to return to them after homing
+            if not self.is_homed and mode != Mode.HOMING and mode != Mode.IDLE:
+                stored_mode = mode
+                stored_dir = dir
+                stored_targ = targ
+                self.mode = Mode.HOMING
+                mode = Mode.HOMING
+
             if mode == Mode.HOMING:
                 self._do_homing()
+                # If homing was successful and we have a stored mode, return to it
+                if self.is_homed and 'stored_mode' in locals():
+                    self.mode = stored_mode
+                    self.direction = stored_dir
+                    self.target = stored_targ
+                    mode = stored_mode
+                    print(f"Returning to mode: {mode.name}")
 
             elif mode == Mode.PID_SPEED:
-                if not self.is_homed:
-                    print("ERROR: Not homed")
-                    self.mode = Mode.IDLE
-                elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
+                if now - self.last_pid_update >= PID_UPDATE_INTERVAL:
                     ref = targ if dir == Direction.FW else -targ
                     out = self.speed_pid.compute(ref, self.current_speed)
                     duty = max(min(abs(out), 100), 0)
@@ -325,29 +347,36 @@ class MotorSystem:
             pos_mm = pos_ticks / PULSES_PER_MM
             pos_in = pos_mm / 25.4
             
-            # Read load cell data
-            load_value = self.load_cell.read_load_value() if self.load_cell.connected else 0.0
-            hold, stable = self.load_cell.read_status_flags() if self.load_cell.connected else (False, False)
+            #load_value = self.load_cell.read_load_value() if self.load_cell.connected else 0.0
+            #hold, stable = self.load_cell.read_status_flags() if self.load_cell.connected else (False, False)
             
             data = {
                 "timestamp": time.monotonic(),
+                "mode": self.mode.value,
+                "direction": self.direction.value,
+                "target": self.target,
+                "setpoint": self.pid_setpoint,
                 "pos_ticks": pos_ticks,
                 "pos_mm": round(pos_mm, 3),
                 "pos_inches": round(pos_in, 3),
                 "current": 0.0,
-                "load": load_value if load_value is not None else 0.0,
-                "hold": 1 if hold else 0,
-                "stable": 1 if stable else 0,
-                "current_speed": round(self.current_speed, 3)
+                #"load": load_value if load_value is not None else 0.0,
+                #"hold": 1 if hold else 0,
+                # "stable": 1 if stable else 0,
+                "current_speed": round(self.current_speed, 3),
+                "experiment_id": self.experiment_id,
+                "run_id": self.run_id,
+                "project_id": self.project_id,
             }
-            self.logger.log(data)
+            # self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
-            time.sleep(0.001)
+            print(f"Published data: {data}") 
+            time.sleep(0.2)
 
     def stop(self):
         self.running = False
         self.control_motor(0, Direction.IDLE)
-        self.logger.stop()
+        # self.logger.stop()
         self.client.loop_stop()
         self.pi.stop()
         if hasattr(self, 'load_cell'):

@@ -1,94 +1,82 @@
-{% extends "base.html" %}
-
-{% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h1 class="mb-4">DUNE Control System</h1>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-6">
-        <div class="control-panel">
-            <h3>System Status</h3>
-            <div class="mb-3">
-                <span class="status-indicator status-online" id="lcu-status"></span>
-                <span>LCU Status: <span id="lcu-status-text">Checking...</span></span>
-            </div>
-            <div class="mb-3">
-                <span class="status-indicator status-online" id="dcu-status"></span>
-                <span>DCU Status: <span id="dcu-status-text">Checking...</span></span>
-            </div>
-        </div>
-    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Panel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            color: white;
+        }
+        #resetBtn { background-color: #ff9800; }
+        #stopBtn { background-color: #f44336; }
+        #forwardBtn { background-color: #4CAF50; }
+        #backwardBtn { background-color: #2196F3; }
+        .input-container {
+            margin: 20px 0;
+        }
+        input[type="number"] {
+            padding: 8px;
+            font-size: 16px;
+            width: 100px;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Control Panel</h1>
     
-    <div class="col-md-6">
-        <div class="control-panel">
-            <h3>Quick Actions</h3>
-            <div class="d-grid gap-2">
-                <a href="/control" class="btn btn-primary">Go to Control Panel</a>
-                <button class="btn btn-warning" onclick="resetSystem()">Reset System</button>
-                <button class="emergency-button" onclick="emergencyStop()">EMERGENCY STOP</button>
-            </div>
-        </div>
+    <div class="input-container">
+        <label for="target">Target Speed (-100 to 100):</label>
+        <input type="number" id="target" value="50" min="-100" max="100">
     </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-    // Check device status periodically
-    function checkDeviceStatus() {
-        axios.get('/api/device_status')
-            .then(response => {
-                const data = response.data;
-                updateDeviceStatus('lcu', data.lcu);
-                updateDeviceStatus('dcu', data.dcu);
-            })
-            .catch(error => {
-                console.error('Error checking device status:', error);
-            });
-    }
+    <div class="button-container">
+        <button id="resetBtn" onclick="sendCommand('reset')">Reset</button>
+        <button id="stopBtn" onclick="sendCommand('stop')">Stop</button>
+        <button id="forwardBtn" onclick="sendCommand('forward')">Forward</button>
+        <button id="backwardBtn" onclick="sendCommand('backward')">Backward</button>
+    </div>
 
-    function updateDeviceStatus(device, status) {
-        const statusIndicator = document.getElementById(`${device}-status`);
-        const statusText = document.getElementById(`${device}-status-text`);
-        
-        if (status.online) {
-            statusIndicator.className = 'status-indicator status-online';
-            statusText.textContent = 'Online';
-        } else {
-            statusIndicator.className = 'status-indicator status-offline';
-            statusText.textContent = 'Offline';
-        }
-    }
-
-    function emergencyStop() {
-        if (confirm('Are you sure you want to trigger an emergency stop?')) {
-            axios.post('/api/emergency_stop')
-                .then(response => {
-                    alert('Emergency stop triggered: ' + response.data.message);
-                })
-                .catch(error => {
-                    alert('Error triggering emergency stop: ' + error.message);
+    <script>
+        async function sendCommand(action) {
+            const target = document.getElementById('target').value;
+            const data = action === 'forward' || action === 'backward' ? { target: parseInt(target) } : {};
+            
+            try {
+                const response = await fetch(`/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
                 });
+                const result = await response.json();
+                console.log('Command sent successfully:', result);
+            } catch (error) {
+                console.error('Error sending command:', error);
+            }
         }
-    }
-
-    function resetSystem() {
-        if (confirm('Are you sure you want to reset the system?')) {
-            axios.post('/api/reset')
-                .then(response => {
-                    alert('System reset initiated: ' + response.data.message);
-                })
-                .catch(error => {
-                    alert('Error resetting system: ' + error.message);
-                });
-        }
-    }
-
-    // Check status every 5 seconds
-    setInterval(checkDeviceStatus, 5000);
-    checkDeviceStatus(); // Initial check
-</script>
-{% endblock %} 
+    </script>
+</body>
+</html> 
