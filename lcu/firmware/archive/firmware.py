@@ -313,32 +313,39 @@ class MotorSystem:
         print("=== Homing (retracting) ===")
 
         for attempt in range(MAX_HOMING_RETRIES):
+            print(f"Starting homing attempt {attempt + 1}/{MAX_HOMING_RETRIES}")
             last_pos = self.encoder_pos
             still_counter = 0
             start = time.monotonic()
             self.control_motor(HOMING_SPEED, Direction.BW)
+            
+            # Try to find stable position
             while time.monotonic() - start < HOMING_TIMEOUT:
                 time.sleep(0.005)
-                delta = abs(self.encoder_pos - last_pos)
+                current_pos = self.encoder_pos
+                delta = abs(current_pos - last_pos)
+                
                 if delta == 0:
                     still_counter += 1
+                    if still_counter >= 10:  # Found stable position
+                        self.control_motor(0, Direction.IDLE)
+                        time.sleep(0.3)
+                        self.encoder_pos = 0
+                        self.is_homed = True
+                        self.homing_in_progress = False
+                        print("✅ Homing complete")
+                        return
                 else:
                     still_counter = 0
-                if still_counter >= 10:
-                    break
-                last_pos = self.encoder_pos
+                
+                last_pos = current_pos
+            
+            # If we get here, this attempt timed out
             self.control_motor(0, Direction.IDLE)
             time.sleep(0.3)
-            if still_counter >= 10:
-                self.encoder_pos = 0
-                self.is_homed = True
-                self.homing_in_progress = False
-                print("Homing complete")
-                return
-            else:
-                print(f"⚠️ Homing attempt {attempt+1} failed, retrying...")
+            print(f"⚠️ Homing attempt {attempt + 1} timed out")
 
-        print("Homing failed after max retries")
+        print("❌ Homing failed after all retries")
         self.homing_in_progress = False
 
     def send_data_loop(self):

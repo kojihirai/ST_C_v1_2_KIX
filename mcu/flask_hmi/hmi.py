@@ -45,7 +45,7 @@ def forward():
 @app.route('/backward', methods=['POST'])
 def backward():
     target = request.json.get('target', 50)
-    send_mqtt_command(mode=3, direction=2, target=target)
+    send_mqtt_command(mode=2, direction=2, target=target)
     return jsonify({"status": "success"})
 
 if __name__ == '__main__':
