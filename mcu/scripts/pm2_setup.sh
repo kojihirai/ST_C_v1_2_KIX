@@ -74,6 +74,27 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     },
     {
+      name: 'flask-hmi',
+      script: 'flask_hmi/hmi.py',
+      interpreter: '${VENV_PATH}',
+      watch: false,
+      autorestart: true,
+      max_restarts: 10,
+      restart_delay: 5000,
+      env: {
+        NODE_ENV: 'production',
+        PYTHONUNBUFFERED: '1',
+        PYTHONPATH: '$(pwd)',
+        PATH: '$(pwd)/venv/bin:${PATH}'
+      },
+      error_file: 'logs/flask-hmi-error.log',
+      out_file: 'logs/flask-hmi-out.log',
+      log_file: 'logs/flask-hmi-combined.log',
+      time: true,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+    },
+    {
       name: 'nextjs-app',
       cwd: './hmi',
       script: 'node_modules/next/dist/bin/next',
@@ -124,4 +145,4 @@ echo "PM2 setup complete! Your applications are now running and will start autom
 echo "To check status: pm2 status"
 echo "To view logs: pm2 logs"
 echo "To restart: pm2 restart all"
-echo "To check detailed logs: pm2 logs ota-service --lines 100"
+echo "To check detailed logs: pm2 logs flask-hmi --lines 100"
