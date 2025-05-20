@@ -46,7 +46,10 @@ export default function LcuControlTab({
   // Execute command when values change if executeOnChange is true
   useEffect(() => {
     if (executeOnChange && !isReadOnly) {
-      executeLcuCommand()
+      const timeoutId = setTimeout(() => {
+        executeLcuCommand()
+      }, 50) // Add a small delay to debounce rapid changes
+      return () => clearTimeout(timeoutId)
     }
   }, [lcuTarget, lcuDirection, executeOnChange, executeLcuCommand, isReadOnly])
 

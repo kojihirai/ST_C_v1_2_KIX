@@ -7,6 +7,7 @@ import LcuControlTab from "./lcu-control-tab"
 import DcuControlTab from "./dcu-control-tab"
 import { LcuDirection, DcuDirection, LcuCommand, DcuCommand } from "@/lib/constants"
 import { Project } from "@/lib/api-client"
+import React from "react"
 
 interface ControlPanelProps {
   lcuDirection: LcuDirection
@@ -37,7 +38,16 @@ export default function ControlPanel({
   mode,
   selectedProject
 }: ControlPanelProps) {
+  // Track last sent command values
+  const [lastLcuCommand, setLastLcuCommand] = React.useState<{direction: LcuDirection, target: number} | null>(null);
+  const [lastDcuCommand, setLastDcuCommand] = React.useState<{direction: DcuDirection, target: number} | null>(null);
+
   const executeLcuCommand = () => {
+    // Only send command if values have changed
+    if (lastLcuCommand?.direction === lcuDirection && lastLcuCommand?.target === lcuTarget) {
+      return;
+    }
+
     let params: Record<string, number | string> = {}
     let command: LcuCommand = LcuCommand.idle
 
@@ -51,9 +61,15 @@ export default function ControlPanel({
 
     console.log(`Sending LCU command: ${command} with params:`, params)
     executeCommand("lcu", command, params)
+    setLastLcuCommand({ direction: lcuDirection, target: lcuTarget })
   }
 
   const executeDcuCommand = () => {
+    // Only send command if values have changed
+    if (lastDcuCommand?.direction === dcuDirection && lastDcuCommand?.target === dcuTarget) {
+      return;
+    }
+
     let params: Record<string, number | string> = {}
     let command: DcuCommand = DcuCommand.idle
 
@@ -66,6 +82,7 @@ export default function ControlPanel({
     }
 
     executeCommand("dcu", command, params)
+    setLastDcuCommand({ direction: dcuDirection, target: dcuTarget })
   }
 
   const stopLcu = () => {
@@ -102,7 +119,7 @@ export default function ControlPanel({
               : lcuTarget}
             setLcuTarget={setLcuTarget}
             executeLcuCommand={executeLcuCommand}
-            executeOnChange={executeOnChange}
+            executeOnChange={executeOnChange && mode === "manual"}
             isReadOnly={mode === "experiment"}
             projectDirection={mode === "experiment" && projectControls?.lcu && typeof projectControls.lcu === 'object' && 'direction' in projectControls.lcu 
               ? projectControls.lcu.direction as string 
@@ -129,7 +146,7 @@ export default function ControlPanel({
               : dcuTarget}
             setDcuTarget={setDcuTarget}
             executeDcuCommand={executeDcuCommand}
-            executeOnChange={executeOnChange}
+            executeOnChange={executeOnChange && mode === "manual"}
             isReadOnly={mode === "experiment"}
             projectDirection={mode === "experiment" && projectControls?.dcu && typeof projectControls.dcu === 'object' && 'direction' in projectControls.dcu 
               ? projectControls.dcu.direction as DcuDirection 

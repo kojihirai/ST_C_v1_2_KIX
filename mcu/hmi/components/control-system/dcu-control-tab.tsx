@@ -44,10 +44,13 @@ export default function DcuControlTab({
     }
   }, [setDcuDirection, isReadOnly]);
 
-  // Execute command when values change if executeOnChange is true and not in idle mode
+  // Execute command when values change if executeOnChange is true
   useEffect(() => {
     if (executeOnChange && !isReadOnly) {
-      executeDcuCommand()
+      const timeoutId = setTimeout(() => {
+        executeDcuCommand()
+      }, 50) // Add a small delay to debounce rapid changes
+      return () => clearTimeout(timeoutId)
     }
   }, [dcuTarget, dcuDirection, executeOnChange, executeDcuCommand, isReadOnly])
 

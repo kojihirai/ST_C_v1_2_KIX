@@ -130,7 +130,6 @@ class PIDController:
         self.prev_derivative = 0.0
         self.last_time = time.monotonic()
 
-
 # ----------------------------------------------------
 # Enums
 # ----------------------------------------------------
@@ -144,7 +143,6 @@ class Direction(Enum):
     IDLE = 0
     FW = 1
     BW = 2
-
 
 # ----------------------------------------------------
 # MotorSystem Class (Main)
