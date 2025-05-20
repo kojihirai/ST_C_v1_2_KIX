@@ -141,8 +141,8 @@ class Mode(Enum):
 
 class Direction(Enum):
     IDLE = 0
-    FW = 1
-    BW = 2
+    FW = 2
+    BW = 1
 
 # ----------------------------------------------------
 # MotorSystem Class (Main)
