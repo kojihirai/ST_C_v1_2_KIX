@@ -333,11 +333,11 @@ class MotorSystem:
                 "timestamp": time.monotonic(),
                 "pos_ticks": pos_ticks,
                 "pos_mm": round(pos_mm, 3),
-                "pos_inches": round(pos_in, 3),
-                "current": 0.0,
+                # "pos_inches": round(pos_in, 3),
+                # "current": 0.0,
                 "load": load_value if load_value is not None else 0.0,
-                "hold": 1 if hold else 0,
-                "stable": 1 if stable else 0,
+                # "hold": 1 if hold else 0,
+                # "stable": 1 if stable else 0,
                 "current_speed": round(self.current_speed, 3)
             }
             self.logger.log(data)
