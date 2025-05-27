@@ -18,7 +18,7 @@ import ADS1263
 # === Config ===
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
-REF = 5.08
+REF = 4.880
 VOLTAGE_SCALE = 24.0 / 5.0
 
 ADC_PINS = {
@@ -84,14 +84,14 @@ class SensorController:
 
                 # Convert voltage to current
                 if sensor_name == "DRILL":
-                    # current = voltage
-                    current = voltage / 0.020  # 20 mV/A
+                    current = voltage
+                    # current = voltage / 0.020  # 20 mV/A
                 elif sensor_name == "POWER":
-                    # current = voltage
-                    current = voltage / 0.100  # 100 mV/A
+                    current = voltage
+                    # current = voltage / 0.100  # 100 mV/A
                 elif sensor_name == "LINEAR":
-                    # current = voltage
-                    current = voltage / 0.1875  # 187.5 mV/A
+                    current = voltage
+                    # current = voltage / 0.1875  # 187.5 mV/A
                 elif sensor_name == "VIN":
                     current = signed * REF * VOLTAGE_SCALE / 0x7FFFFFFF
 
