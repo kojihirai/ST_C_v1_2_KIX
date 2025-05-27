@@ -84,13 +84,16 @@ class SensorController:
 
                 # Convert voltage to current
                 if sensor_name == "DRILL":
-                    current = voltage
+                    current = raw
+                    # current = voltage
                     # current = voltage / 0.020  # 20 mV/A
                 elif sensor_name == "POWER":
-                    current = voltage
+                    current = raw
+                    # current = voltage
                     # current = voltage / 0.100  # 100 mV/A
                 elif sensor_name == "LINEAR":
-                    current = voltage
+                    current = raw
+                    # current = voltage
                     # current = voltage / 0.1875  # 187.5 mV/A
                 elif sensor_name == "VIN":
                     current = signed * REF * VOLTAGE_SCALE / 0x7FFFFFFF
