@@ -1,21 +1,17 @@
 import time
 import pigpio
 
-# Motor 1 and Motor 2 pin configurations
 MOTOR1_PINS = {"RPWM": 12, "LPWM": 13, "REN": 23, "LEN": 24}
 MOTOR2_PINS = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
 
-# Initialize pigpio
 pi = pigpio.pi()
 if not pi.connected:
     raise Exception("Could not connect to pigpio daemon")
 
-# Set all motor control pins to output and low
 for pin in list(MOTOR1_PINS.values()) + list(MOTOR2_PINS.values()):
     pi.set_mode(pin, pigpio.OUTPUT)
     pi.write(pin, 0)
 
-# Enable both motor drivers
 pi.write(MOTOR1_PINS["REN"], 1)
 pi.write(MOTOR1_PINS["LEN"], 1)
 pi.write(MOTOR2_PINS["REN"], 1)
@@ -52,7 +48,6 @@ try:
     move_motor(MOTOR2_PINS, 0)
 
 finally:
-    # Clean up all motors
     for pin_set in [MOTOR1_PINS, MOTOR2_PINS]:
         pi.set_PWM_dutycycle(pin_set["RPWM"], 0)
         pi.set_PWM_dutycycle(pin_set["LPWM"], 0)

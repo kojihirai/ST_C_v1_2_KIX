@@ -24,14 +24,12 @@ VOLTAGE_SCALE = 24.0 / 5.0
 ADC_PINS = {
     "DRILL": 0,
     "POWER": 1,
-    "LINEAR": 2,
-    "VIN": 3
+    "LINEAR": 2
 }
 # Full Scale 5V
 # Drill motor: IN0 - 20mv/A
 # Power In: IN1 - 100mv/A
 # Linear actuator: IN 2 -187.5 mV/A
-# VIN IN3
 
 # === Main Motor Controller ===
 class SensorController:
@@ -41,17 +39,16 @@ class SensorController:
         self.client.loop_start()
         self.client.subscribe(f"{DEVICE_ID}/cmd")
         self.client.on_message = self.on_message
-        # Initialize IDs as integers with default value 0
+
         self.project_id = 0
         self.experiment_id = 0
         self.run_id = 0
-        # Threads
+
         self.running = True
-        # Initialize ADC
         self.ADC = ADS1263.ADS1263()
         if (self.ADC.ADS1263_init_ADC1('ADS1263_400SPS') == -1):
             raise Exception("Failed to initialize ADC")
-        self.ADC.ADS1263_SetMode(0)  # 0 is singleChannel mode
+        self.ADC.ADS1263_SetMode(0)
         threading.Thread(target=self.run, daemon=True).start()
         threading.Thread(target=self.publish_status, daemon=True).start()
 
@@ -59,11 +56,10 @@ class SensorController:
         """Main run loop for the controller"""
         while self.running:
             try:
-                # Main processing loop
-                time.sleep(0.1)  # Small sleep to prevent CPU hogging
+                time.sleep(0.1)
             except Exception as e:
                 self.send_error(f"Run loop error: {e}")
-                time.sleep(1)  # Longer sleep on error
+                time.sleep(1)
 
     def read_sensors(self):
         try:
@@ -74,7 +70,6 @@ class SensorController:
             for sensor_name, channel in ADC_PINS.items():
                 raw = adc_values[channel]
 
-                # Convert unsigned to signed 32-bit
                 if raw & 0x80000000:
                     signed = raw - 0x100000000
                 else:
@@ -82,7 +77,6 @@ class SensorController:
 
                 voltage = signed * REF / 0x7FFFFFFF
 
-                # Convert voltage to current
                 if sensor_name == "DRILL":
                     # current = signed
                     current = voltage
@@ -95,8 +89,6 @@ class SensorController:
                     # current = signed
                     current = voltage
                     # current = voltage / 0.1875  # 187.5 mV/A
-                elif sensor_name == "VIN":
-                    current = signed * REF * VOLTAGE_SCALE / 0x7FFFFFFF
 
                 measurements[sensor_name] = current
 
@@ -123,7 +115,6 @@ class SensorController:
                     "DRILL_CURRENT": measurements["DRILL"],
                     "POWER_CURRENT": measurements["POWER"],
                     "LINEAR_CURRENT": measurements["LINEAR"],
-                    "VIN_VOLTAGE": measurements["VIN"],
                     "project_id": self.project_id,
                     "experiment_id": self.experiment_id,
                     "run_id": self.run_id
@@ -139,7 +130,7 @@ class SensorController:
 
     def stop(self):
         self.running = False
-        self.ADC.ADS1263_Exit()  # Clean up ADC
+        self.ADC.ADS1263_Exit()
         self.client.loop_stop()
         print("SDU stopped.")
 

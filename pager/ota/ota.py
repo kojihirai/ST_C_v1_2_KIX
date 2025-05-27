@@ -8,11 +8,9 @@ import time
 
 app = Flask(__name__)
 
-# PagerDuty configuration
 PAGERDUTY_ROUTING_KEY = 'fb7168b8f0c74f0ac0b7ca3daaf80e3f'
 PAGERDUTY_EVENTS_URL = 'https://events.pagerduty.com/v2/enqueue'
 
-# Flag to prevent status checks during updates
 is_updating = False
 status_check_thread = None
 
@@ -25,7 +23,6 @@ def send_pagerduty_alert(title, description, urgency='high', priority='P1'):
         'Content-Type': 'application/json'
     }
 
-    # Map urgency to valid PagerDuty severity
     severity_map = {
         'high': 'critical',
         'medium': 'warning',
@@ -74,9 +71,8 @@ def send_pagerduty_alert(title, description, urgency='high', priority='P1'):
 def background_status_check():
     while True:
         if not is_updating:
-            # Check system status here if needed
             pass
-        time.sleep(60)  # Check every minute
+        time.sleep(60)
 
 @app.route('/')
 def index():
@@ -109,7 +105,6 @@ def create_page():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Start the background status check thread
     status_check_thread = threading.Thread(target=background_status_check, daemon=True)
     status_check_thread.start()
     app.run(host='0.0.0.0', port=1215)

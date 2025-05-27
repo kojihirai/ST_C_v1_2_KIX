@@ -45,7 +45,7 @@ class TorqueDriver:
         if result is not None:
             return result
         else:
-            print("❌ Failed to read torque")
+            print("Failed to read torque")
             return None
         
     def read_rpm(self):
@@ -53,7 +53,7 @@ class TorqueDriver:
         if result is not None:
             return result
         else:
-            print("❌ Failed to read RPM")
+            print("Failed to read RPM")
             return None
 
     def read_parameter(self, address, length=1, signed=False):
@@ -119,12 +119,10 @@ class MotorController:
         self.rpm_value = 0.0
         self.rpm_offset = 0.0
 
-        # Initialize IDs as integers with default value 0
         self.project_id = 0
         self.experiment_id = 0
         self.run_id = 0
 
-        # pigpio PWM setup
         self.pi = pigpio.pi()
         for pin in [MOTOR1_PINS["RPWM"], MOTOR1_PINS["LPWM"], MOTOR1_PINS["REN"], MOTOR1_PINS["LEN"]]:
             self.pi.set_mode(pin, pigpio.OUTPUT)
@@ -132,7 +130,6 @@ class MotorController:
         self.pi.write(MOTOR1_PINS["REN"], 1)
         self.pi.write(MOTOR1_PINS["LEN"], 1)
 
-        # TorqueDriver (Modbus)
         self.torque_sensor = TorqueDriver(
             port="/dev/ttyACM0",
             baudrate=19200,
@@ -145,25 +142,20 @@ class MotorController:
         if not self.torque_sensor.connected:
             self.send_error("Torque sensor failed to connect")
 
-        # Threads
         self.running = True
         threading.Thread(target=self.run, daemon=True).start()
         threading.Thread(target=self.publish_status, daemon=True).start()
 
     def read_sensors(self):
-        # Read torque and RPM in a single try-except block
         try:
-            # Read both parameters at once to minimize Modbus communication
             torque = self.torque_sensor.read_parameter(0x00, 2, signed=True)
             rpm = self.torque_sensor.read_parameter(0x02, 2, signed=True)
             
-            # Update values only if readings are valid
             if torque is not None:
                 self.torque_value = (torque / 100.0) * 10
             if rpm is not None:
                 self.rpm_value = rpm
         except Exception as e:
-            # Log error but continue operation
             print(f"Sensor read error: {e}")
 
     def on_message(self, client, userdata, msg):

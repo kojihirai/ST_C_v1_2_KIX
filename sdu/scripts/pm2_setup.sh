@@ -1,26 +1,20 @@
 #!/bin/bash
 
-# Ensure we're in the correct directory
 cd "$(dirname "$0")/.."
 
-# Check if PM2 is installed
 if ! command -v pm2 &> /dev/null; then
     echo "PM2 is not installed. Installing PM2..."
     npm install -g pm2
 fi
 
-# Stop and delete all PM2 processes
 echo "Stopping and deleting all PM2 processes..."
 pm2 delete all
 
-# Remove PM2 startup configuration
 echo "Removing PM2 startup configuration..."
 pm2 unstartup
 
-# Get the absolute path to the virtual environment
 VENV_PATH="$(pwd)/venv/bin/python3"
 
-# Create PM2 ecosystem file
 cat > ecosystem.config.js << EOL
 module.exports = {
   apps: [
@@ -70,19 +64,15 @@ module.exports = {
 };
 EOL
 
-# Clean up old logs
 echo "Cleaning up old logs..."
 rm -rf logs
 mkdir -p logs
 
-# Start the applications
 echo "Starting applications with PM2..."
 pm2 start ecosystem.config.js
 
-# Save the PM2 process list
 pm2 save
 
-# Setup PM2 to start on system boot
 echo "Setting up PM2 startup script..."
 STARTUP_CMD=$(pm2 startup | grep -o "sudo.*")
 if [ ! -z "$STARTUP_CMD" ]; then

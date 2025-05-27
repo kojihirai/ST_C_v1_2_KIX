@@ -11,17 +11,14 @@ import time
 
 app = Flask(__name__)
 
-# Update paths to be relative to the lcu directory
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'firmware')
 ARCHIVE_FOLDER = os.path.join(UPLOAD_FOLDER, 'archive')
 MAX_ARCHIVE_VERSIONS = 3
-PM2_APP_NAME = 'firmware-service'  # Updated to match PM2 config
+PM2_APP_NAME = 'firmware-service'
 
-# PagerDuty configuration
 PAGERDUTY_ROUTING_KEY = 'fb7168b8f0c74f0ac0b7ca3daaf80e3f'
 PAGERDUTY_EVENTS_URL = 'https://events.pagerduty.com/v2/enqueue'
 
-# Flag to prevent status checks during updates
 is_updating = False
 status_check_thread = None
 
@@ -66,7 +63,6 @@ def get_pm2_status():
         for process in processes:
             if process['name'] == PM2_APP_NAME:
                 status = process['pm2_env']['status']
-                # Send PagerDuty alert if status is not 'online'
                 if status != 'online':
                     send_pagerduty_alert(status)
                 return {
@@ -86,7 +82,6 @@ def archive_current_firmware():
         archive_name = f'firmware_{timestamp}.py'
         shutil.move(current_firmware, os.path.join(ARCHIVE_FOLDER, archive_name))
         
-        # Clean up old archives
         archives = glob.glob(os.path.join(ARCHIVE_FOLDER, 'firmware_*.py'))
         archives.sort(reverse=True)
         for old_archive in archives[MAX_ARCHIVE_VERSIONS:]:
@@ -96,7 +91,7 @@ def background_status_check():
     while True:
         if not is_updating:
             get_pm2_status()
-        time.sleep(60)  # Check every minute
+        time.sleep(60)
 
 @app.route('/')
 def index():
@@ -123,7 +118,6 @@ def upload_file():
         file_path = os.path.join(UPLOAD_FOLDER, 'firmware.py')
         file.save(file_path)
         
-        # Restart the firmware service using PM2
         subprocess.run(['pm2', 'restart', PM2_APP_NAME])
         
         is_updating = False
@@ -137,7 +131,6 @@ def status():
     return jsonify(get_pm2_status())
 
 if __name__ == '__main__':
-    # Start the background status check thread
     status_check_thread = threading.Thread(target=background_status_check, daemon=True)
     status_check_thread.start()
     app.run(host='0.0.0.0', port=1215)

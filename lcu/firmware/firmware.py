@@ -8,7 +8,7 @@ from queue import Queue
 
 import paho.mqtt.client as mqtt
 import pigpio
-from pymodbus.client import ModbusSerialClient  # Re-enabled Modbus
+from pymodbus.client import ModbusSerialClient
 
 # ----------------------------------------------------
 # HighSpeedLogger Class

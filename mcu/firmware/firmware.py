@@ -9,9 +9,7 @@ import psycopg2.extras
 import json
 import asyncio
 import signal
-import paho.mqtt.client as mqtt  # MQTT client for device communication
-
-# --- Pydantic Models ---
+import paho.mqtt.client as mqtt
 
 class Project(BaseModel):
     project_id: int
@@ -82,7 +80,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Use specific origins instead of wildcard
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,13 +102,11 @@ def update_project_experiment_count(conn, project_id):
     """Recalculate and update the experiment count for a project"""
     cur = conn.cursor()
     try:
-        # Count the actual number of experiments for this project
         cur.execute("""
             SELECT COUNT(*) FROM experiments WHERE project_id = %s
         """, (project_id,))
         count = cur.fetchone()[0]
         
-        # Update the project's experiment_count
         cur.execute("""
             UPDATE projects 
             SET experiment_count = %s,
@@ -206,7 +202,6 @@ def create_project(data: ProjectCreate):
 @app.get("/projects/{project_id}", response_model=Project)
 def get_project(project_id: int):
     conn = get_conn()
-    # Use DictCursor to get results as dictionaries
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("""
         SELECT 
@@ -233,7 +228,6 @@ def get_project(project_id: int):
 @app.get("/projects", response_model=List[Project])
 def get_projects():
     conn = get_conn()
-    # Use DictCursor to get results as dictionaries
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("""
         SELECT 
@@ -281,28 +275,20 @@ def delete_project(project_id: int):
     cur = conn.cursor()
     
     try:
-        # Start a transaction
         cur.execute("BEGIN")
         
-        # First delete related records in the correct order
-        # Delete run videos
         cur.execute("DELETE FROM run_videos WHERE run_id IN (SELECT run_id FROM runs WHERE experiment_id IN (SELECT experiment_id FROM experiments WHERE project_id = %s));", (project_id,))
         
-        # Delete runs
         cur.execute("DELETE FROM runs WHERE experiment_id IN (SELECT experiment_id FROM experiments WHERE project_id = %s);", (project_id,))
         
-        # Delete experiments
         cur.execute("DELETE FROM experiments WHERE project_id = %s;", (project_id,))
         
-        # Finally delete the project
         cur.execute("DELETE FROM projects WHERE project_id = %s;", (project_id,))
         
-        # Commit the transaction
         conn.commit()
         
         return {"message": f"Project {project_id} and all related data deleted successfully."}
     except Exception as e:
-        # Rollback in case of error
         conn.rollback()
         print(f"Error deleting project: {e}")
         raise HTTPException(status_code=500, detail=f"Error deleting project: {str(e)}")
@@ -318,10 +304,8 @@ def create_experiment(data: ExperimentCreate):
     cur = conn.cursor()
     
     try:
-        # Start a transaction
         cur.execute("BEGIN")
-        
-        # Insert the new experiment
+
         cur.execute("""
             INSERT INTO experiments (project_id, experiment_name, experiment_description, experiment_params)
             VALUES (%s, %s, %s, %s) RETURNING experiment_id;
@@ -329,15 +313,12 @@ def create_experiment(data: ExperimentCreate):
         
         experiment_id = cur.fetchone()[0]
         
-        # Update the experiment_count in the projects table
         update_project_experiment_count(conn, data.project_id)
         
-        # Commit the transaction
         conn.commit()
         
         return {"experiment_id": experiment_id}
     except Exception as e:
-        # Rollback in case of error
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating experiment: {str(e)}")
     finally:
@@ -362,15 +343,12 @@ def update_experiment(project_id: int, experiment_id: int, data: ExperimentCreat
     cur = conn.cursor()
     
     try:
-        # Start a transaction
         cur.execute("BEGIN")
         
-        # Check if the experiment exists and belongs to the project
         cur.execute("SELECT 1 FROM experiments WHERE experiment_id = %s AND project_id = %s", (experiment_id, project_id))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail=f"Experiment {experiment_id} not found in project {project_id}")
         
-        # Update the experiment
         cur.execute("""
             UPDATE experiments
             SET experiment_name = %s,
@@ -386,15 +364,12 @@ def update_experiment(project_id: int, experiment_id: int, data: ExperimentCreat
             project_id
         ))
         
-        # Commit the transaction
         conn.commit()
         
         return {"message": f"Experiment {experiment_id} updated."}
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        # Rollback in case of error
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Error updating experiment: {str(e)}")
     finally:
@@ -407,21 +382,16 @@ def delete_experiment(project_id: int, experiment_id: int):
     cur = conn.cursor()
     
     try:
-        # Start a transaction
         cur.execute("BEGIN")
         
-        # Delete the experiment
         cur.execute("DELETE FROM experiments WHERE experiment_id = %s AND project_id = %s;", (experiment_id, project_id))
-        
-        # Update the experiment count
+
         update_project_experiment_count(conn, project_id)
         
-        # Commit the transaction
         conn.commit()
         
         return {"message": f"Experiment {experiment_id} deleted."}
     except Exception as e:
-        # Rollback in case of error
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Error deleting experiment: {str(e)}")
     finally:
@@ -551,14 +521,11 @@ async def emergency_stop(project_id: int, experiment_id: int, run_id: int, db=De
 
 @app.post("/projects/{project_id}/experiments/{experiment_id}/reset")
 async def reset_experiment(project_id: int, experiment_id: int):
-    # Create homing command for LCU
     homing_command = {
         "command": "homing",
         "project_id": project_id,
         "experiment_id": experiment_id
     }
-
-    # Send command to LCU
     mqtt_client.publish("lcu/cmd", json.dumps(homing_command))
     
     return {
@@ -579,7 +546,7 @@ async def shutdown():
     await db_pool.close()
 
 def signal_handler(sig, frame):
-    print("\n🔴 Keyboard Interrupt detected! Shutting down gracefully...")
+    print("\nKeyboard Interrupt detected! Shutting down gracefully...")
     mqtt_client.loop_stop()
     mqtt_client.disconnect()
 
