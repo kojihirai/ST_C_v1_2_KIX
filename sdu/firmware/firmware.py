@@ -69,24 +69,20 @@ class SensorController:
             measurements = {}
             for sensor_name, channel in ADC_PINS.items():
                 raw = adc_values[channel]
-
-                if raw & 0x80000000:
-                    signed = raw - 0x100000000
+                
+                # Use the same logic as the example code
+                if raw >> 31 == 1:
+                    voltage = -(REF*2 - raw * REF / 0x80000000)
                 else:
-                    signed = raw
-
-                voltage = signed * REF / 0x7FFFFFFF
+                    voltage = raw * REF / 0x7fffffff
 
                 if sensor_name == "DRILL":
-                    # current = signed
                     current = voltage
                     # current = voltage / 0.020  # 20 mV/A
                 elif sensor_name == "POWER":
-                    # current = signed
                     current = voltage
                     # current = voltage / 0.100  # 100 mV/A
                 elif sensor_name == "LINEAR":
-                    # current = signed
                     current = voltage
                     # current = voltage / 0.1875  # 187.5 mV/A
 
