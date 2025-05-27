@@ -19,7 +19,6 @@ import ADS1263
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
 REF = 4.880
-VOLTAGE_SCALE = 24.0 / 5.0
 
 ADC_PINS = {
     "DRILL": 0,
@@ -70,7 +69,6 @@ class SensorController:
             for sensor_name, channel in ADC_PINS.items():
                 raw = adc_values[channel]
                 
-                # Use the same logic as the example code
                 if raw >> 31 == 1:
                     voltage = -(REF*2 - raw * REF / 0x80000000)
                 else:
