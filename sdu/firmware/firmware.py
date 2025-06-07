@@ -69,18 +69,18 @@ class SensorController:
             for sensor_name, channel in ADC_PINS.items():
                 raw = adc_values[channel]
                 
-                data24 = raw & 0xFFFFFF
+                # 1) isolate the low 24 bits
+                raw24 = raw & 0xFFFFFF
 
-                # 2) convert to signed
-                if data24 & (1 << 23):        # if sign bit set
-                    data_signed = data24 - (1 << 24)
+                # 2) two's-complement into Python int
+                if raw24 & 0x800000:            # bit 23 = sign
+                    signed = raw24 - 0x100000   # subtract 2^24
                 else:
-                    data_signed = data24
+                    signed = raw24
 
                 # 3) scale to voltage
-                #    – use (2**23 – 1) as the positive full-scale
-                #    – REF must be your actual reference voltage (e.g. 2.5 V or VDD)
-                voltage = data_signed * REF / (2**23 - 1)
+                #    (2^23 - 1) = 8 388 607 is positive full-scale for 24 bits
+                voltage = signed * REF / (2**23 - 1)
 
                 if sensor_name == "DRILL":
                     # current = voltage
