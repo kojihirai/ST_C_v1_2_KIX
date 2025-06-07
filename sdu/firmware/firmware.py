@@ -74,15 +74,15 @@ class SensorController:
                 else:
                     voltage = raw * REF / 0x7fffffff
 
-                if sensor_name == "DRILL":
+                #if sensor_name == "DRILL":
+                    # current = voltage
+                    #current = voltage
+                if sensor_name == "POWER":
                     # current = voltage
                     current = voltage
-                elif sensor_name == "POWER":
+                #elif sensor_name == "LINEAR":
                     # current = voltage
-                    current = voltage
-                elif sensor_name == "LINEAR":
-                    # current = voltage
-                    current = voltage
+                    #current = voltage
 
                 measurements[sensor_name] = current
 
@@ -106,9 +106,9 @@ class SensorController:
             if measurements:
                 status = {
                     "timestamp": time.monotonic(),
-                    "DRILL_CURRENT": measurements["DRILL"],
+                    #"DRILL_CURRENT": measurements["DRILL"],
                     "POWER_CURRENT": measurements["POWER"],
-                    "LINEAR_CURRENT": measurements["LINEAR"],
+                    #"LINEAR_CURRENT": measurements["LINEAR"],
                     "project_id": self.project_id,
                     "experiment_id": self.experiment_id,
                     "run_id": self.run_id
