@@ -76,15 +76,15 @@ class SensorController:
 
                 if sensor_name == "DRILL":
                     # current = voltage
-                    current = (voltage/1000)/0.1
+                    current = voltage
                     measurements[sensor_name] = current
                 elif sensor_name == "POWER":
                     # current = voltage
-                    current = ((voltage/10))/1.1
+                    current = voltage
                     measurements[sensor_name] = current
                 elif sensor_name == "LINEAR":
                     # current = voltage
-                    current = (voltage/0.19125)
+                    current = voltage
                     measurements[sensor_name] = current
                 else:
                     pass
