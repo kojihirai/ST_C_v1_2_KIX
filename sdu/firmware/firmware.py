@@ -80,11 +80,13 @@ class SensorController:
                 if sensor_name == "POWER":
                     # current = voltage
                     current = voltage
+                    measurements[sensor_name] = current
+
                 #elif sensor_name == "LINEAR":
                     # current = voltage
                     #current = voltage
 
-                measurements[sensor_name] = current
+                # measurements[sensor_name] = current
 
             return measurements
         except Exception as e:
