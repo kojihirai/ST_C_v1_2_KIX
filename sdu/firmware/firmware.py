@@ -88,7 +88,7 @@ class SensorController:
                     measurements[sensor_name] = current
                 else:
                     pass
-                return measurements
+            return measurements
         except Exception as e:
             print(f"Sensor read error: {e}")
             return None
