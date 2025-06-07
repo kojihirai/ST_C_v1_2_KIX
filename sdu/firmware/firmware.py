@@ -86,10 +86,12 @@ class SensorController:
                 # Convert 24-bit ADC value to voltage
                 # The ADS1263 is a 24-bit ADC with bipolar output
                 # Full scale is ±VREF
-                if raw >> 23 == 1:  # Negative value
-                    voltage = -((0x1000000 - raw) * REF / 0x800000)
-                else:  # Positive value
-                    voltage = (raw * REF) / 0x800000
+                if raw & 0x800000:  # Check if bit 23 is set (negative value)
+                    # Convert from two's complement
+                    raw = raw - 0x1000000
+                
+                # Convert to voltage
+                voltage = (raw * REF) / 0x800000
                 
                 print(f"Converted voltage for {sensor_name}: {voltage:.3f}V")
 
