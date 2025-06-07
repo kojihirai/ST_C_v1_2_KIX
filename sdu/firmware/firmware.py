@@ -75,9 +75,14 @@ class SensorController:
                 else:
                     voltage = raw * REF / 0x7fffff  # 0x7fffff is 2^23 - 1
 
-                if sensor_name == "POWER":
+                if sensor_name == "DRILL":
                     current = voltage
-                    measurements[sensor_name] = current
+                elif sensor_name == "POWER":
+                    current = voltage
+                elif sensor_name == "LINEAR":
+                    current = voltage
+                
+                measurements[sensor_name] = current
 
             return measurements
         except Exception as e:
