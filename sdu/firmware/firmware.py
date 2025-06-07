@@ -104,9 +104,9 @@ class SensorController:
             if measurements:
                 status = {
                     "timestamp": time.monotonic(),
-                    #"DRILL_CURRENT": measurements["DRILL"],
+                    "DRILL_CURRENT": measurements["DRILL"],
                     "POWER_CURRENT": measurements["POWER"],
-                    #"LINEAR_CURRENT": measurements["LINEAR"],
+                    "LINEAR_CURRENT": measurements["LINEAR"],
                     "project_id": self.project_id,
                     "experiment_id": self.experiment_id,
                     "run_id": self.run_id
