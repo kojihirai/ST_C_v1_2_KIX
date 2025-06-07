@@ -84,14 +84,10 @@ class SensorController:
                     measurements[sensor_name] = current
                 elif sensor_name == "LINEAR":
                     # current = voltage
-                    current = (voltage)/105
+                    current = (voltage/105)
                     measurements[sensor_name] = current
                 else:
                     pass
-
-                
-
-            return measurements
         except Exception as e:
             print(f"Sensor read error: {e}")
             return None
