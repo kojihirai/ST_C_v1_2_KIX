@@ -47,7 +47,20 @@ class SensorController:
         self.ADC = ADS1263.ADS1263()
         if (self.ADC.ADS1263_init_ADC1('ADS1263_400SPS') == -1):
             raise Exception("Failed to initialize ADC")
-        self.ADC.ADS1263_SetMode(0)
+        
+        # Configure ADC with explicit settings
+        self.ADC.ADS1263_ConfigADC(
+            ADS1263.ADS1263_GAIN['ADS1263_GAIN_1'],  # Gain = 1
+            ADS1263.ADS1263_DRATE['ADS1263_400SPS']  # Data rate = 400 SPS
+        )
+        
+        # Verify ADC configuration
+        print("ADC Configuration:")
+        print(f"Reference Voltage: {REF}V")
+        print(f"Gain: 1")
+        print(f"Data Rate: 400 SPS")
+        
+        self.ADC.ADS1263_SetMode(0)  # Single-ended mode
         threading.Thread(target=self.run, daemon=True).start()
         threading.Thread(target=self.publish_status, daemon=True).start()
 
@@ -68,21 +81,27 @@ class SensorController:
             measurements = {}
             for sensor_name, channel in ADC_PINS.items():
                 raw = adc_values[channel]
+                print(f"Raw ADC value for {sensor_name}: {raw} (hex: {hex(raw)})")
                 
                 # Convert 24-bit ADC value to voltage
-                if raw >> 23 == 1:  # Check sign bit (bit 23 for 24-bit value)
-                    voltage = -(REF*2 - raw * REF / 0x800000)  # 0x800000 is 2^23
-                else:
-                    voltage = raw * REF / 0x7fffff  # 0x7fffff is 2^23 - 1
+                # The ADS1263 is a 24-bit ADC with bipolar output
+                # Full scale is ±VREF
+                if raw >> 23 == 1:  # Negative value
+                    voltage = -((0x1000000 - raw) * REF / 0x800000)
+                else:  # Positive value
+                    voltage = (raw * REF) / 0x800000
+                
+                print(f"Converted voltage for {sensor_name}: {voltage:.3f}V")
 
                 if sensor_name == "DRILL":
                     current = voltage
+                    measurements[sensor_name] = current
                 elif sensor_name == "POWER":
                     current = voltage
+                    measurements[sensor_name] = current
                 elif sensor_name == "LINEAR":
                     current = voltage
-                
-                measurements[sensor_name] = current
+                    measurements[sensor_name] = current
 
             return measurements
         except Exception as e:
