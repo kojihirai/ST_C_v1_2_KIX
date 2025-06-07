@@ -69,10 +69,18 @@ class SensorController:
             for sensor_name, channel in ADC_PINS.items():
                 raw = adc_values[channel]
                 
-                if raw >> 31 == 1:
-                    voltage = -(REF*2 - raw * REF / 0x80000000)
+                data24 = raw & 0xFFFFFF
+
+                # 2) convert to signed
+                if data24 & (1 << 23):        # if sign bit set
+                    data_signed = data24 - (1 << 24)
                 else:
-                    voltage = raw * REF / 0x7fffffff
+                    data_signed = data24
+
+                # 3) scale to voltage
+                #    – use (2**23 – 1) as the positive full-scale
+                #    – REF must be your actual reference voltage (e.g. 2.5 V or VDD)
+                voltage = data_signed * REF / (2**23 - 1)
 
                 if sensor_name == "DRILL":
                     # current = voltage
