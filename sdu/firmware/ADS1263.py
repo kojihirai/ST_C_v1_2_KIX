@@ -387,24 +387,24 @@ class ADS1263:
         
     # Read ADC data
     def ADS1263_Read_ADC_Data(self):
-        config.digital_write(self.cs_pin, GPIO.LOW)#cs  0
-        while(1):
+        # pull CS low and issue the RDATA1 command
+        config.digital_write(self.cs_pin, GPIO.LOW)
+        while True:
             config.spi_writebyte([ADS1263_CMD['CMD_RDATA1']])
-            # config.delay_ms(10)
-            if(config.spi_readbytes(1)[0] & 0x40 != 0):
+            # wait for DRDY bit in status byte
+            if (config.spi_readbytes(1)[0] & 0x40) != 0:
                 break
+        # read status + 3 data bytes + CRC
         buf = config.spi_readbytes(5)
-        config.digital_write(self.cs_pin, GPIO.HIGH)#cs 1
-        read  = (buf[0]<<24) & 0xff000000
-        read |= (buf[1]<<16) & 0xff0000
-        read |= (buf[2]<<8) & 0xff00
-        read |= (buf[3]) & 0xff
-        CRC = buf[4]
-        # print(read, CRC)
-        if(self.ADS1263_CheckSum(read, CRC) != 0):
-            print("ADC1 data read error!")
-        return read
- 
+        config.digital_write(self.cs_pin, GPIO.HIGH)
+
+        # buf[0] = status, buf[1..3] = MSB,MID,LSB of 24-bit data
+        raw = (buf[1] << 16) | (buf[2] << 8) | buf[3]
+        # sign-extend 24→32 bits
+        if raw & 0x800000:
+            raw -= 1 << 24
+        return raw
+
  
     # Read ADC2 data
     def ADS1263_Read_ADC2_Data(self):
