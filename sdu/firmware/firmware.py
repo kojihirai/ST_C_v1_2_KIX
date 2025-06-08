@@ -15,7 +15,7 @@ DEVICE_ID = "sdu"
 
 # ADS1115 channel → sensor mapping
 ADC_CHANNELS = {
-    "DRILL": ADS.P0,
+    "DRILL": ADS.P4,
     "POWER": ADS.P1,
     "LINEAR": ADS.P2
 }
