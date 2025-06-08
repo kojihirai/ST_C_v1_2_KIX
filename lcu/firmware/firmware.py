@@ -342,7 +342,7 @@ class MotorSystem:
             }
             self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
-            time.sleep(0.001)
+            time.sleep(0.2)
 
     def stop(self):
         self.running = False
