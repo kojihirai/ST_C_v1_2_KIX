@@ -152,7 +152,7 @@ class MotorController:
             rpm = self.torque_sensor.read_parameter(0x02, 2, signed=True)
             
             if torque is not None:
-                self.torque_value = (torque / 100.0) 
+                self.torque_value = (torque / 1000.0) 
             if rpm is not None:
                 self.rpm_value = rpm
         except Exception as e:
