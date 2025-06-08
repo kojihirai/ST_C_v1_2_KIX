@@ -25,9 +25,9 @@ ADC_CHANNELS = {
 # Power In:     100 mV/A → 0.1 V/A
 # Linear:       187.5 mV/A → 0.1875 V/A
 CONVERSION = {
-    "DRILL": 0.1,
-    "POWER": 1,
-    "LINEAR": 0.19125
+    "DRILL": 0.02,
+    "POWER": 0.1,
+    "LINEAR": 0.1875
 }
 
 class SensorController:
