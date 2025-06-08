@@ -80,7 +80,7 @@ class SensorController:
                     measurements[sensor_name] = current
                 elif sensor_name == "POWER":
                     # current = voltage
-                    current = -voltage * 2 / 0.1
+                    current = -(voltage * 2-3) / 0.1
                     # current = voltage
                     measurements[sensor_name] = current
                 elif sensor_name == "LINEAR":
