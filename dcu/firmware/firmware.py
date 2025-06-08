@@ -152,7 +152,7 @@ class MotorController:
             rpm = self.torque_sensor.read_parameter(0x02, 2, signed=True)
             
             if torque is not None:
-                self.torque_value = (torque / 100.0) * 10
+                self.torque_value = (torque / 100.0) 
             if rpm is not None:
                 self.rpm_value = rpm
         except Exception as e:
@@ -211,7 +211,7 @@ class MotorController:
                 "target": self.target,
                 "setpoint": self.pid_setpoint,
                 "rpm": round(self.rpm_value, 1),
-                "torque": round(self.torque_value, 2)/10,
+                "torque": round(self.torque_value, 2),
                 "project_id": self.project_id,
                 "experiment_id": self.experiment_id,
                 "run_id": self.run_id
