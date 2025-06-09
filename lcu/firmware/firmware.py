@@ -65,7 +65,6 @@ class LoadCellDriver:
             if response.isError():
                 print(f"Failed to read parameter at address {hex(address)}")
                 return None
-
             # unpack raw value
             if length == 1:
                 raw = response.registers[0]
@@ -77,8 +76,6 @@ class LoadCellDriver:
                     raw = struct.unpack('>i', struct.pack('>I', raw))[0]
 
             scaled = raw / self.scale_factor
-            # Debug print removed or kept as desired:
-            print(f"Read {raw} from {hex(address)} → scaled: {scaled}")
             return scaled
 
         except ModbusException as e:
