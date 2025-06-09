@@ -64,7 +64,7 @@ def set_motor_pwm(duty_percent, direction):
     duty = int(1_000_000 * duty_percent / 100)
     pi.write(REN, 1)
     pi.write(LEN, 1)
-    if direction > 0:
+    if direction < 0:
         pi.hardware_PWM(RPWM, 0, 0)
         pi.hardware_PWM(LPWM, PWM_FREQ, duty)
     else:
