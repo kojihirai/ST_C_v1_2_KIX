@@ -150,49 +150,51 @@ class Direction(Enum):
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "lcu"
 MAX_CURRENT = 5.0
-# MOTOR_PINS = {"RPWM": 12, "LPWM": 13, "REN": 23, "LEN": 24}
 MOTOR_PINS = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
-# ENC_A, ENC_B = 5, 6
 ENC_A, ENC_B = 20, 21
 PULSES_PER_MM = 33
 ERROR_TOLERANCE = 0.002
 HOMING_SPEED = 50
 HOMING_TIMEOUT = 10.0
 PID_UPDATE_INTERVAL = 0.001
-LOAD_THREAD_SLEEP = 0.001
 MAX_HOMING_RETRIES = 3
 
 class MotorSystem:
     def __init__(self):
+        # MQTT setup
         self.client = mqtt.Client()
         self.client.connect(BROKER_IP, 1883, 60)
         self.client.loop_start()
         self.client.subscribe(f"{DEVICE_ID}/cmd")
         self.client.on_message = self.on_message
 
+        # state
         self.mode = Mode.IDLE
         self.direction = Direction.IDLE
-        self.target = 0
+        self.target = 0.0
         self.pid_setpoint = 0.0
         self.encoder_pos = 0
         self.last_encoder_pos = 0
         self.current_speed = 0.0
         self.is_homed = False
         self.homing_in_progress = False
+        self.first_command = True                # ← flag for first MQTT message
         self.last_speed_time = time.monotonic()
         self.last_pid_update = 0.0
-        self.pid_active = False
 
+        # PID & hardware
         self.speed_pid = PIDController(2.0, 0.05, 0.2, 50.0, 0.2)
         self.state_lock = threading.Lock()
         self.pi = pigpio.pi()
 
+        # configure motor pins
         for pin in MOTOR_PINS.values():
             self.pi.set_mode(pin, pigpio.OUTPUT)
             self.pi.write(pin, 0)
         self.pi.write(MOTOR_PINS["REN"], 1)
         self.pi.write(MOTOR_PINS["LEN"], 1)
 
+        # encoder inputs
         self.pi.set_mode(ENC_A, pigpio.INPUT)
         self.pi.set_mode(ENC_B, pigpio.INPUT)
         self.pi.set_pull_up_down(ENC_A, pigpio.PUD_UP)
@@ -200,9 +202,11 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
+        # load cell & logger
         self.load_cell = LoadCell('/dev/ttyUSB0', 9600, 'E', 1, 8, 1, 1)
         self.logger = HighSpeedLogger()
 
+        # main loops
         self.running = True
         threading.Thread(target=self.run_loop, daemon=True).start()
         threading.Thread(target=self.send_data_loop, daemon=True).start()
@@ -234,6 +238,14 @@ class MotorSystem:
         try:
             data = json.loads(msg.payload.decode())
             with self.state_lock:
+                # first incoming command → do homing
+                if self.first_command:
+                    self.first_command = False
+                    print("First command received, performing auto-homing…")
+                    self._do_homing()
+                    print("Auto-homing complete.")
+
+                # now update mode/target/etc
                 if 'mode' in data:
                     self.mode = Mode(data['mode'])
                 if 'direction' in data:
@@ -242,7 +254,8 @@ class MotorSystem:
                     self.target = float(data['target'])
                 if 'pid_setpoint' in data:
                     self.pid_setpoint = float(data['pid_setpoint'])
-            print(f"Received command: mode={self.mode}, direction={self.direction}, target={self.target}, setpoint={self.pid_setpoint}")
+            print(f"Received command: mode={self.mode}, direction={self.direction}, "
+                  f"target={self.target}, setpoint={self.pid_setpoint}")
         except Exception as e:
             print(f"MQTT command error: {e}")
 
@@ -258,28 +271,23 @@ class MotorSystem:
 
             with self.state_lock:
                 mode = self.mode
-                dir = self.direction
+                dir_ = self.direction
                 targ = self.target
 
             if mode == Mode.HOMING:
                 self._do_homing()
 
             elif mode == Mode.RUN_CONTINUOUS:
+                # fallback homing if somehow not homed
                 if not self.is_homed:
                     self._do_homing()
-                    print("Homing complete")
-                    self.is_homed = True
-                    self.homing_in_progress = False
                 elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
-                    ref = targ if dir == Direction.FW else -targ
+                    ref = targ if dir_ == Direction.FW else -targ
                     out = self.speed_pid.compute(ref, self.current_speed)
                     duty = max(min(abs(out), 100), 0)
                     direction = Direction.FW if out >= 0 else Direction.BW
                     self.control_motor(duty, direction)
                     self.last_pid_update = now
-
-            # elif mode == Mode.RUN_CONTINUOUS:
-            #     self.control_motor(targ, dir)
 
             elif mode == Mode.IDLE:
                 self.control_motor(0, Direction.IDLE)
@@ -291,7 +299,6 @@ class MotorSystem:
             return
         self.homing_in_progress = True
         print("=== Homing (retracting) ===")
-
         for attempt in range(MAX_HOMING_RETRIES):
             last_pos = self.encoder_pos
             still_counter = 0
@@ -312,13 +319,12 @@ class MotorSystem:
             if still_counter >= 10:
                 self.encoder_pos = 0
                 self.is_homed = True
-                self.homing_in_progress = False
                 print("Homing complete")
-                return
+                break
             else:
-                print(f"Homing attempt {attempt+1} failed, retrying...")
-
-        print("Homing failed after max retries")
+                print(f"Homing attempt {attempt+1} failed, retrying…")
+        else:
+            print("Homing failed after max retries")
         self.homing_in_progress = False
 
     def send_data_loop(self):
@@ -326,18 +332,17 @@ class MotorSystem:
             pos_ticks = self.encoder_pos
             pos_mm = pos_ticks / PULSES_PER_MM
             pos_in = pos_mm / 25.4
-            
-            # Read load cell data
+
             load_value = self.load_cell.read_load_value() if self.load_cell.connected else 0.0
             hold, stable = self.load_cell.read_status_flags() if self.load_cell.connected else (False, False)
-            
+
             data = {
                 "timestamp": time.monotonic(),
                 "pos_ticks": pos_ticks,
                 "pos_mm": round(pos_mm, 3),
                 "pos_inches": round(pos_in, 3),
                 "current": 0.0,
-                "load": load_value if load_value is not None else 0.0,
+                "load": load_value or 0.0,
                 "hold": 1 if hold else 0,
                 "stable": 1 if stable else 0,
                 "current_speed": round(self.current_speed, 3)
