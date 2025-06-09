@@ -88,7 +88,7 @@ class LoadCellAmplifier:
 
     def read_data_register(self, address):
         # Function code 0x03: Read data register
-        result = self.client.read_holding_registers(address=address, count=1, unit=self.slave_address)
+        result = self.client.read_holding_registers(address=address, count=1, slave=self.slave_address)
         if not result.isError():
             return result.registers[0]
         else:
@@ -96,7 +96,7 @@ class LoadCellAmplifier:
     
     def modify_switch_value(self, address, value):
         # Function code 0x05: Modify switch value (Quickly modify switch value)
-        result = self.client.write_coil(address=address, value=value, unit=self.slave_address)
+        result = self.client.write_coil(address=address, value=value, slave=self.slave_address)
         if result.isError():
             raise Exception(f"Error modifying switch value at address {address}: {result}")
 
@@ -107,7 +107,7 @@ class LoadCellAmplifier:
             builder.add_16bit_int(value)
         
         payload = builder.to_registers()
-        result = self.client.write_registers(address=start_address, values=payload, unit=self.slave_address)
+        result = self.client.write_registers(address=start_address, values=payload, slave=self.slave_address)
         if result.isError():
             raise Exception(f"Error modifying data register at address {start_address}: {result}")
     
