@@ -415,6 +415,7 @@ class MotorSystem:
             }
             self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
+            print(f"Published data: {data}") 
             time.sleep(0.2)
 
     def stop(self):
