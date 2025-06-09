@@ -1,85 +1,89 @@
 from pymodbus.client import ModbusSerialClient
-from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadBuilder, BinaryPayloadDecoder
+from pymodbus.exceptions import ModbusException
+import struct
+import time
 
-class LoadCellAmplifier:
-    def __init__(self, port, baudrate=9600, slave_address=0x01, parity='N', stopbits=1, bytesize=8, timeout=1):
+class LoadCellDriver:
+    def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
         self.client = ModbusSerialClient(
             port=port,
             baudrate=baudrate,
+            timeout=timeout,
             parity=parity,
             stopbits=stopbits,
-            bytesize=bytesize,
-            timeout=timeout
+            bytesize=bytesize
         )
-        self.slave_address = slave_address
-    
-    def connect(self):
-        if not self.client.connect():
-            raise ConnectionError("Unable to connect to the Modbus device")
-    
-    def disconnect(self):
+        self.slave_id = slave_id
+        self.connected = False
+
+    def __del__(self):
         self.client.close()
 
-    def read_data_register(self, address):
-        # Function code 0x03: Read data register
-        result = self.client.read_holding_registers(address=address, count=1, unit=self.slave_address)
-        if not result.isError():
-            return result.registers[0]
-        else:
-            raise Exception(f"Error reading register at address {address}: {result}")
-    
-    def modify_switch_value(self, address, value):
-        # Function code 0x05: Modify switch value (Quickly modify switch value)
-        result = self.client.write_coil(address, value, slave=self.slave_address)
-        if result.isError():
-            raise Exception(f"Error modifying switch value at address {address}: {result}")
+    def connect(self):
+        try:
+            self.client.connect()
+            self.connected = True
+            return True
+        except Exception as e:
+            print(f"Failed to connect: {e}")
+            return False
 
-    def modify_data_register(self, start_address, values):
-        # Function code 0x10: Modify multi-bit data register value
-        builder = BinaryPayloadBuilder(byteorder=Endian.Big)
-        for value in values:
-            builder.add_16bit_int(value)
-        
-        payload = builder.to_registers()
-        result = self.client.write_registers(start_address, payload, slave=self.slave_address)
-        if result.isError():
-            raise Exception(f"Error modifying data register at address {start_address}: {result}")
-    
-    def zero_calibration(self):
-        # Write zero calibration value (Address 0x00H, Function code 0x03 or 0x10)
-        self.modify_data_register(0x00, [0x0000])
+    def disconnect(self):
+        try:
+            self.client.close()
+            self.connected = False
+            print("Successfully disconnected")
+        except Exception as e:
+            print(f"Failed to disconnect: {e}")
 
-    def set_baud_rate(self, rate):
-        # Set baud rate (Address 0x18H, Function code 0x03 or 0x10)
-        baud_rate_mapping = {4800: 1, 9600: 2, 19200: 3}
-        if rate not in baud_rate_mapping:
-            raise ValueError("Invalid baud rate. Choose from 4800, 9600, or 19200.")
-        
-        self.modify_data_register(0x18, [baud_rate_mapping[rate]])
+    def read_parameter(self, address, length=1, signed=False):
+        try:
+            # Read holding registers
+            response = self.client.read_holding_registers(address, length, slave=self.slave_id)
+            if not response.isError():
+                if length == 1:
+                    # 16-bit register
+                    value = response.registers[0]
+                    if signed:
+                        value = struct.unpack('>h', struct.pack('>H', value))[0]
+                elif length == 2:
+                    # 32-bit register (combine two 16-bit registers)
+                    value = (response.registers[0] << 16) | response.registers[1]
+                    if signed:
+                        value = struct.unpack('>i', struct.pack('>I', value))[0]
 
-    def restore_factory_settings(self):
-        # Restore factory setting (Address 0x03H, Function code 0x05 or 0x10, write FF)
-        self.modify_switch_value(0x03, True)  # Writing FF as True in this context
+                print(f"Read value from address {hex(address)}: {value}")
+                return value
+            else:
+                print(f"Failed to read parameter at address {hex(address)}")
+                return None
+        except ModbusException as e:
+            print(f"ModbusException: Failed to read parameter at address {hex(address)}: {e}")
+        except Exception as e:
+            print(f"Unexpected error: Failed to read parameter at address {hex(address)}: {e}")
+            return None
 
-    def clear_display_value(self):
-        # Clear display value (Address 0x00H, Function code 0x05 or 0x10, write FF)
-        self.modify_switch_value(0x00, True)  # Writing FF as True in this context
-    
-    def read_weight_value(self):
-        # Current weight value (Address 0x00H, Function code 0x03)
-        return self.read_data_register(0x00)
+    def write_parameter(self, address, value):
+        try:
+            # Write single register
+            response = self.client.write_register(address, value, slave=self.slave_id)
+            if not response.isError():
+                print(f"Successfully wrote value {value} to address {hex(address)}")
+                return True
+            else:
+                print(f"Failed to write value {value} to address {hex(address)}")
+                return False
+        except ModbusException as e:
+            print(f"ModbusException: Failed to write parameter at address {hex(address)}: {e}")
+        except Exception as e:
+            print(f"Unexpected error: Failed to write parameter at address {hex(address)}: {e}")
+            return False
 
-# Example usage:
 if __name__ == "__main__":
-    try:
-        load_cell = LoadCellAmplifier(port='/dev/ttyUSB0', baudrate=9600, slave_address=0x01)
-        load_cell.connect()
-        
-        # Reading current weight value
-        weight = load_cell.read_weight_value()
-        print(f"Current Weight: {weight}")
-        
-        load_cell.disconnect()
-    except Exception as e:
-        print(f"Error: {e}")
+    modbus_control = LoadCellDriver("/dev/ttyUSB0", 9600, "N", 1, 8, 1, 1)
+    modbus_control.connect()
+    
+    modbus_control.read_parameter(0x00, length=2, signed=True)
+    time.sleep(0.1)
+    
+    modbus_control.disconnect()
