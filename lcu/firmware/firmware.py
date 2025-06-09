@@ -10,7 +10,7 @@ import paho.mqtt.client as mqtt
 import pigpio
 from pymodbus.client import ModbusSerialClient
 from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadBuilder, BinaryPayloadDecoder
+from pymodbus.payload import BinaryPayloadBuilder
 
 # ----------------------------------------------------
 # HighSpeedLogger Class
@@ -20,9 +20,10 @@ class HighSpeedLogger:
         self.filename = filename
         self.file = open(self.filename, mode='w', newline='', buffering=1)
         self.csv_writer = csv.writer(self.file)
+        # drop hold/stable columns
         self.csv_writer.writerow([
             "timestamp", "pos_ticks", "pos_mm", "pos_inches",
-            "current", "load", "hold", "stable", "current_speed"
+            "current", "load", "current_speed"
         ])
         self.queue = Queue(maxsize=100000)
         self.running = True
@@ -49,8 +50,6 @@ class HighSpeedLogger:
                 record.get("pos_inches", 0.0),
                 record.get("current", 0.0),
                 record.get("load", 0.0),
-                1 if record.get("hold", False) else 0,
-                1 if record.get("stable", False) else 0,
                 record.get("current_speed", 0.0)
             ]
             self.csv_writer.writerow(row)
@@ -62,7 +61,7 @@ class HighSpeedLogger:
         self.file.close()
 
 # ----------------------------------------------------
-# LoadCellAmplifier Class
+# LoadCellAmplifier Class (revised to “correct” version)
 # ----------------------------------------------------
 class LoadCellAmplifier:
     def __init__(self, port, baudrate=9600, slave_address=0x01, parity='N', stopbits=1, bytesize=8, timeout=1):
@@ -75,132 +74,76 @@ class LoadCellAmplifier:
             timeout=timeout
         )
         self.slave_address = slave_address
-        self.connected = False
-    
+
     def connect(self):
         if not self.client.connect():
             raise ConnectionError("Unable to connect to the Modbus device")
-        self.connected = True
-    
+
     def disconnect(self):
         self.client.close()
-        self.connected = False
 
     def read_data_register(self, address):
-        # Function code 0x03: Read data register
-        result = self.client.read_holding_registers(address=address, count=1, slave=self.slave_address)
-        if not result.isError():
-            return result.registers[0]
-        else:
-            raise Exception(f"Error reading register at address {address}: {result}")
-
-    def read_input_register(self, address):
-        # Function code 0x04: Read input register
-        result = self.client.read_input_registers(address=address, count=1, slave=self.slave_address)
-        if not result.isError():
-            return result.registers[0]
-        else:
-            raise Exception(f"Error reading input register at address {address}: {result}")
-    
-    def modify_switch_value(self, address, value):
-        # Function code 0x05: Modify switch value (Quickly modify switch value)
-        result = self.client.write_coil(address=address, value=value, slave=self.slave_address)
+        result = self.client.read_holding_registers(address, count=1, slave=self.slave_address)
         if result.isError():
-            raise Exception(f"Error modifying switch value at address {address}: {result}")
+            raise Exception(f"Error reading register at address {address}: {result}")
+        return result.registers[0]
+
+    def modify_switch_value(self, address, value):
+        result = self.client.write_coil(address, value, slave=self.slave_address)
+        if result.isError():
+            raise Exception(f"Error writing coil at address {address}: {result}")
 
     def modify_data_register(self, start_address, values):
-        # Function code 0x10: Modify multi-bit data register value
         builder = BinaryPayloadBuilder(byteorder=Endian.Big)
-        for value in values:
-            builder.add_16bit_int(value)
-        
+        for v in values:
+            builder.add_16bit_int(v)
         payload = builder.to_registers()
-        result = self.client.write_registers(address=start_address, values=payload, slave=self.slave_address)
+        result = self.client.write_registers(start_address, payload, slave=self.slave_address)
         if result.isError():
-            raise Exception(f"Error modifying data register at address {start_address}: {result}")
-    
+            raise Exception(f"Error writing registers at address {start_address}: {result}")
+
     def zero_calibration(self):
-        # Write zero calibration value (Address 0x00H, Function code 0x03 or 0x10)
         self.modify_data_register(0x00, [0x0000])
 
     def set_baud_rate(self, rate):
-        # Set baud rate (Address 0x18H, Function code 0x03 or 0x10)
-        baud_rate_mapping = {4800: 1, 9600: 2, 19200: 3}
-        if rate not in baud_rate_mapping:
-            raise ValueError("Invalid baud rate. Choose from 4800, 9600, or 19200.")
-        
-        self.modify_data_register(0x18, [baud_rate_mapping[rate]])
+        mapping = {4800:1, 9600:2, 19200:3}
+        if rate not in mapping:
+            raise ValueError("Invalid baud rate.")
+        self.modify_data_register(0x18, [mapping[rate]])
 
     def restore_factory_settings(self):
-        # Restore factory setting (Address 0x03H, Function code 0x05 or 0x10, write FF)
-        self.modify_switch_value(0x03, True)  # Writing FF as True in this context
+        self.modify_switch_value(0x03, True)
 
     def clear_display_value(self):
-        # Clear display value (Address 0x00H, Function code 0x05 or 0x10, write FF)
-        self.modify_switch_value(0x00, True)  # Writing FF as True in this context
-    
+        self.modify_switch_value(0x00, True)
+
     def read_weight_value(self):
-        """Reads the current weight value from input register 4 (0x04)"""
-        try:
-            # Read from input register 4 (0x04) which typically contains the weight value
-            result = self.client.read_input_registers(address=4, count=2, slave=self.slave_address)
-            if not result.isError():
-                # Combine two registers into a 32-bit value
-                raw = (result.registers[0] << 16) | result.registers[1]
-                # Convert to signed integer
-                return struct.unpack('>i', struct.pack('>I', raw))[0]
-            else:
-                raise Exception(f"Error reading weight value: {result}")
-        except Exception as e:
-            print(f"Error reading weight value: {e}")
-            return None
-
-    def read_load_value(self):
-        """Reads the load value from the load cell."""
-        try:
-            return self.read_weight_value()
-        except Exception as e:
-            print(f"Error reading load value: {e}")
-            return None
-
-    def read_status_flags(self):
-        """Reads 'hold' and 'stable' status bits."""
-        try:
-            # Read discrete inputs for status flags
-            result = self.client.read_discrete_inputs(address=0, count=2, slave=self.slave_address)
-            if not result.isError():
-                return result.bits[0], result.bits[1]  # hold, stable
-            else:
-                raise Exception(f"Error reading status flags: {result}")
-        except Exception as e:
-            print(f"Error reading status flags: {e}")
-            return None, None
+        # Read the “weight” from register 0x00
+        return self.read_data_register(0x00)
 
 # ----------------------------------------------------
-# PIDController Class
+# PIDController, Enums, Constants (unchanged)
 # ----------------------------------------------------
 class PIDController:
     def __init__(self, kp, ki, kd, integral_limit=100.0, derivative_filter=0.1):
-        self.kp = kp
-        self.ki = ki
-        self.kd = kd
+        self.kp, self.ki, self.kd = kp, ki, kd
         self.integral_limit = integral_limit
         self.derivative_filter = derivative_filter
         self.reset()
 
     def compute(self, setpoint, measured):
         now = time.monotonic()
-        dt = now - self.last_time
+        dt = max(now - self.last_time, 1e-6)
         self.last_time = now
-        if dt <= 0:
-            dt = 1e-6
+
         error = setpoint - measured
         self.integral = max(min(self.integral + error * dt, self.integral_limit), -self.integral_limit)
         derivative = (error - self.prev_error) / dt
-        filtered_d = self.derivative_filter * derivative + (1 - self.derivative_filter) * self.prev_derivative
+        filtered_d = (self.derivative_filter * derivative +
+                      (1 - self.derivative_filter) * self.prev_derivative)
         output = self.kp * error + self.ki * self.integral + self.kd * filtered_d
-        self.prev_error = error
-        self.prev_derivative = filtered_d
+
+        self.prev_error, self.prev_derivative = error, filtered_d
         return output
 
     def reset(self):
@@ -209,9 +152,6 @@ class PIDController:
         self.prev_derivative = 0.0
         self.last_time = time.monotonic()
 
-# ----------------------------------------------------
-# Enums
-# ----------------------------------------------------
 class Mode(Enum):
     IDLE = 0
     RUN_CONTINUOUS = 2
@@ -223,34 +163,33 @@ class Direction(Enum):
     FW = 2
     BW = 1
 
-# ----------------------------------------------------
-# MotorSystem Class (Main)
-# ----------------------------------------------------
-BROKER_IP = "192.168.2.1"
-DEVICE_ID = "lcu"
-MAX_CURRENT = 5.0
-MOTOR_PINS = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
+# MotorSystem constants
+BROKER_IP   = "192.168.2.1"
+DEVICE_ID   = "lcu"
+MOTOR_PINS  = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
 ENC_A, ENC_B = 20, 21
 PULSES_PER_MM = 33
-ERROR_TOLERANCE = 0.002
-HOMING_SPEED = 50
+HOMING_SPEED  = 50
 HOMING_TIMEOUT = 10.0
-PID_UPDATE_INTERVAL = 0.001
-LOAD_THREAD_SLEEP = 0.001
 MAX_HOMING_RETRIES = 3
+PID_UPDATE_INTERVAL = 0.001
 
+# ----------------------------------------------------
+# MotorSystem Class (with LoadCell usage simplified)
+# ----------------------------------------------------
 class MotorSystem:
     def __init__(self):
+        # MQTT setup
         self.client = mqtt.Client()
         self.client.connect(BROKER_IP, 1883, 60)
         self.client.loop_start()
         self.client.subscribe(f"{DEVICE_ID}/cmd")
         self.client.on_message = self.on_message
 
+        # State
         self.mode = Mode.IDLE
         self.direction = Direction.IDLE
-        self.target = 0
-        self.pid_setpoint = 0.0
+        self.target = 0.0
         self.encoder_pos = 0
         self.last_encoder_pos = 0
         self.current_speed = 0.0
@@ -258,12 +197,13 @@ class MotorSystem:
         self.homing_in_progress = False
         self.last_speed_time = time.monotonic()
         self.last_pid_update = 0.0
-        self.pid_active = False
-
-        self.speed_pid = PIDController(2.0, 0.05, 0.2, 50.0, 0.2)
         self.state_lock = threading.Lock()
-        self.pi = pigpio.pi()
 
+        # PID
+        self.speed_pid = PIDController(2.0, 0.05, 0.2, 50.0, 0.2)
+
+        # GPIO & Encoder
+        self.pi = pigpio.pi()
         for pin in MOTOR_PINS.values():
             self.pi.set_mode(pin, pigpio.OUTPUT)
             self.pi.write(pin, 0)
@@ -277,25 +217,18 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-        # Initialize load cell with proper parameters
-        self.load_cell = LoadCellAmplifier(
-            port='/dev/ttyUSB0',
-            baudrate=9600,
-            slave_address=0x01,
-            parity='E',
-            stopbits=1,
-            bytesize=8,
-            timeout=1
-        )
+        # Load cell
+        self.load_cell = LoadCellAmplifier(port='/dev/ttyUSB0', baudrate=9600, slave_address=0x01)
         try:
             self.load_cell.connect()
-            print("Load cell connected successfully")
+            print("Load cell connected")
         except Exception as e:
-            print(f"Failed to connect to load cell: {e}")
-            self.load_cell.connected = False
+            print(f"Load cell connection failed: {e}")
 
+        # Logger
         self.logger = HighSpeedLogger()
 
+        # Main loops
         self.running = True
         threading.Thread(target=self.run_loop, daemon=True).start()
         threading.Thread(target=self.send_data_loop, daemon=True).start()
@@ -303,25 +236,22 @@ class MotorSystem:
     def _encoder_callback(self, gpio, level, tick):
         A = self.pi.read(ENC_A)
         B = self.pi.read(ENC_B)
-        if gpio == ENC_A:
-            delta = -1 if A == B else 1
-        else:
-            delta = -1 if A != B else 1
+        delta = (-1 if gpio==ENC_A and A==B else 1) if gpio==ENC_A else (-1 if A!=B else 1)
         self.encoder_pos += delta
 
     def control_motor(self, duty_percent, direction):
-        duty = int(1_000_000 * duty_percent / 100.0)
+        duty = int(1_000_000 * max(min(duty_percent, 100),0) / 100)
         self.pi.write(MOTOR_PINS["REN"], 1)
         self.pi.write(MOTOR_PINS["LEN"], 1)
         if direction == Direction.FW:
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 0, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 20000, 0)
             self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 20000, duty)
         elif direction == Direction.BW:
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 0, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 20000, 0)
             self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 20000, duty)
         else:
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 0, 0)
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 0, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 20000, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 20000, 0)
 
     def on_message(self, client, userdata, msg):
         try:
@@ -333,46 +263,39 @@ class MotorSystem:
                     self.direction = Direction(data['direction'])
                 if 'target' in data:
                     self.target = float(data['target'])
-                if 'pid_setpoint' in data:
-                    self.pid_setpoint = float(data['pid_setpoint'])
-            print(f"Received command: mode={self.mode}, direction={self.direction}, target={self.target}, setpoint={self.pid_setpoint}")
+            print(f"Cmd: mode={self.mode}, dir={self.direction}, tgt={self.target}")
         except Exception as e:
-            print(f"MQTT command error: {e}")
+            print(f"MQTT parse error: {e}")
 
     def run_loop(self):
         while self.running:
             now = time.monotonic()
             dt = now - self.last_speed_time
             if dt > 0:
-                delta = (self.encoder_pos - self.last_encoder_pos)
+                delta = self.encoder_pos - self.last_encoder_pos
                 self.current_speed = (delta / PULSES_PER_MM) / dt
                 self.last_encoder_pos = self.encoder_pos
                 self.last_speed_time = now
 
             with self.state_lock:
-                mode = self.mode
-                dir = self.direction
-                targ = self.target
+                mode, direction, tgt = self.mode, self.direction, self.target
 
             if mode == Mode.HOMING:
                 self._do_homing()
-
             elif mode == Mode.PID_SPEED:
                 if not self.is_homed:
                     print("ERROR: Not homed")
                     self.mode = Mode.IDLE
                 elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
-                    ref = targ if dir == Direction.FW else -targ
+                    ref = tgt if direction==Direction.FW else -tgt
                     out = self.speed_pid.compute(ref, self.current_speed)
-                    duty = max(min(abs(out), 100), 0)
-                    direction = Direction.FW if out >= 0 else Direction.BW
-                    self.control_motor(duty, direction)
+                    duty = abs(out)
+                    dir_ = Direction.FW if out>=0 else Direction.BW
+                    self.control_motor(duty, dir_)
                     self.last_pid_update = now
-
             elif mode == Mode.RUN_CONTINUOUS:
-                self.control_motor(targ, dir)
-
-            elif mode == Mode.IDLE:
+                self.control_motor(tgt, direction)
+            else:
                 self.control_motor(0, Direction.IDLE)
 
             time.sleep(0.001)
@@ -381,61 +304,57 @@ class MotorSystem:
         if self.homing_in_progress:
             return
         self.homing_in_progress = True
-        print("=== Homing (retracting) ===")
-
         for attempt in range(MAX_HOMING_RETRIES):
-            last_pos = self.encoder_pos
-            still_counter = 0
-            start = time.monotonic()
+            start_pos = self.encoder_pos
+            still = 0
+            t0 = time.monotonic()
             self.control_motor(HOMING_SPEED, Direction.BW)
-            while time.monotonic() - start < HOMING_TIMEOUT:
+            while time.monotonic() - t0 < HOMING_TIMEOUT:
                 time.sleep(0.005)
-                delta = abs(self.encoder_pos - last_pos)
-                if delta == 0:
-                    still_counter += 1
+                if abs(self.encoder_pos - start_pos) == 0:
+                    still += 1
                 else:
-                    still_counter = 0
-                if still_counter >= 10:
+                    still = 0
+                start_pos = self.encoder_pos
+                if still >= 10:
                     break
-                last_pos = self.encoder_pos
             self.control_motor(0, Direction.IDLE)
             time.sleep(0.3)
-            if still_counter >= 10:
+            if still >= 10:
                 self.encoder_pos = 0
                 self.is_homed = True
-                self.homing_in_progress = False
                 print("Homing complete")
-                return
+                break
             else:
-                print(f"⚠️ Homing attempt {attempt+1} failed, retrying...")
-
-        print("Homing failed after max retries")
+                print(f"Homing attempt {attempt+1} failed")
+        else:
+            print("Homing failed")
         self.homing_in_progress = False
 
     def send_data_loop(self):
         while self.running:
             pos_ticks = self.encoder_pos
-            pos_mm = pos_ticks / PULSES_PER_MM
-            pos_in = pos_mm / 25.4
-            
-            # Read load cell data
-            load_value = self.load_cell.read_load_value() if self.load_cell.connected else 0.0
-            hold, stable = self.load_cell.read_status_flags() if self.load_cell.connected else (False, False)
-            
+            pos_mm    = pos_ticks / PULSES_PER_MM
+            pos_in    = pos_mm / 25.4
+            load_val  = 0.0
+            try:
+                load_val = self.load_cell.read_weight_value()
+            except:
+                pass
+
             data = {
                 "timestamp": time.monotonic(),
                 "pos_ticks": pos_ticks,
-                "pos_mm": round(pos_mm, 3),
-                "pos_inches": round(pos_in, 3),
+                "pos_mm": round(pos_mm,3),
+                "pos_inches": round(pos_in,3),
                 "current": 0.0,
-                "load": load_value if load_value is not None else 0.0,
-                "hold": 1 if hold else 0,
-                "stable": 1 if stable else 0,
-                "current_speed": round(self.current_speed, 3)
+                "load": load_val,
+                "current_speed": round(self.current_speed,3)
             }
+
             self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
-            print(f"Published data: {data}") 
+            print(f"Published: {data}")
             time.sleep(0.2)
 
     def stop(self):
@@ -444,9 +363,7 @@ class MotorSystem:
         self.logger.stop()
         self.client.loop_stop()
         self.pi.stop()
-        if hasattr(self, 'load_cell'):
-            self.load_cell.disconnect()
-            del self.load_cell
+        self.load_cell.disconnect()
 
 if __name__ == "__main__":
     system = MotorSystem()
