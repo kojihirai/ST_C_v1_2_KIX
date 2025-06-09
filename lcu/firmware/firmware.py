@@ -93,6 +93,14 @@ class LoadCellAmplifier:
             return result.registers[0]
         else:
             raise Exception(f"Error reading register at address {address}: {result}")
+
+    def read_input_register(self, address):
+        # Function code 0x04: Read input register
+        result = self.client.read_input_registers(address=address, count=1, slave=self.slave_address)
+        if not result.isError():
+            return result.registers[0]
+        else:
+            raise Exception(f"Error reading input register at address {address}: {result}")
     
     def modify_switch_value(self, address, value):
         # Function code 0x05: Modify switch value (Quickly modify switch value)
@@ -132,8 +140,20 @@ class LoadCellAmplifier:
         self.modify_switch_value(0x00, True)  # Writing FF as True in this context
     
     def read_weight_value(self):
-        # Current weight value (Address 0x00H, Function code 0x03)
-        return self.read_data_register(0x00)
+        """Reads the current weight value from input register 4 (0x04)"""
+        try:
+            # Read from input register 4 (0x04) which typically contains the weight value
+            result = self.client.read_input_registers(address=4, count=2, slave=self.slave_address)
+            if not result.isError():
+                # Combine two registers into a 32-bit value
+                raw = (result.registers[0] << 16) | result.registers[1]
+                # Convert to signed integer
+                return struct.unpack('>i', struct.pack('>I', raw))[0]
+            else:
+                raise Exception(f"Error reading weight value: {result}")
+        except Exception as e:
+            print(f"Error reading weight value: {e}")
+            return None
 
     def read_load_value(self):
         """Reads the load value from the load cell."""
@@ -146,12 +166,12 @@ class LoadCellAmplifier:
     def read_status_flags(self):
         """Reads 'hold' and 'stable' status bits."""
         try:
-            # Read status register (assuming it's at address 0x01)
-            status = self.read_data_register(0x01)
-            # Assuming bit 0 is hold and bit 1 is stable
-            hold = bool(status & 0x01)
-            stable = bool(status & 0x02)
-            return hold, stable
+            # Read discrete inputs for status flags
+            result = self.client.read_discrete_inputs(address=0, count=2, slave=self.slave_address)
+            if not result.isError():
+                return result.bits[0], result.bits[1]  # hold, stable
+            else:
+                raise Exception(f"Error reading status flags: {result}")
         except Exception as e:
             print(f"Error reading status flags: {e}")
             return None, None
