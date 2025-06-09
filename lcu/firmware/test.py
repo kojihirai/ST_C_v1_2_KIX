@@ -23,7 +23,7 @@ class LoadCellAmplifier:
 
     def read_data_register(self, address):
         # Function code 0x03: Read data register
-        result = self.client.read_holding_registers(address, 1, slave=self.slave_address)
+        result = self.client.read_holding_registers(address=address, count=1, unit=self.slave_address)
         if not result.isError():
             return result.registers[0]
         else:
