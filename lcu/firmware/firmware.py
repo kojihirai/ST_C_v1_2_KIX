@@ -8,19 +8,20 @@ from queue import Queue
 
 import paho.mqtt.client as mqtt
 import pigpio
+
+from LoadCell_Driver import LoadCellDriver  # updated import
 from pymodbus.client import ModbusSerialClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadBuilder
 
 # ----------------------------------------------------
-# HighSpeedLogger Class
+# HighSpeedLogger Class (unchanged)
 # ----------------------------------------------------
 class HighSpeedLogger:
     def __init__(self, filename="lcu_highspeed_log.csv"):
         self.filename = filename
         self.file = open(self.filename, mode='w', newline='', buffering=1)
         self.csv_writer = csv.writer(self.file)
-        # drop hold/stable columns
         self.csv_writer.writerow([
             "timestamp", "pos_ticks", "pos_mm", "pos_inches",
             "current", "load", "current_speed"
@@ -60,66 +61,6 @@ class HighSpeedLogger:
         self.thread.join()
         self.file.close()
 
-# ----------------------------------------------------
-# LoadCellAmplifier Class (revised to “correct” version)
-# ----------------------------------------------------
-class LoadCellAmplifier:
-    def __init__(self, port, baudrate=9600, slave_address=0x01, parity='N', stopbits=1, bytesize=8, timeout=1):
-        self.client = ModbusSerialClient(
-            port=port,
-            baudrate=baudrate,
-            parity=parity,
-            stopbits=stopbits,
-            bytesize=bytesize,
-            timeout=timeout
-        )
-        self.slave_address = slave_address
-
-    def connect(self):
-        if not self.client.connect():
-            raise ConnectionError("Unable to connect to the Modbus device")
-
-    def disconnect(self):
-        self.client.close()
-
-    def read_data_register(self, address):
-        result = self.client.read_holding_registers(address, count=1, slave=self.slave_address)
-        if result.isError():
-            raise Exception(f"Error reading register at address {address}: {result}")
-        return result.registers[0]
-
-    def modify_switch_value(self, address, value):
-        result = self.client.write_coil(address, value, slave=self.slave_address)
-        if result.isError():
-            raise Exception(f"Error writing coil at address {address}: {result}")
-
-    def modify_data_register(self, start_address, values):
-        builder = BinaryPayloadBuilder(byteorder=Endian.Big)
-        for v in values:
-            builder.add_16bit_int(v)
-        payload = builder.to_registers()
-        result = self.client.write_registers(start_address, payload, slave=self.slave_address)
-        if result.isError():
-            raise Exception(f"Error writing registers at address {start_address}: {result}")
-
-    def zero_calibration(self):
-        self.modify_data_register(0x00, [0x0000])
-
-    def set_baud_rate(self, rate):
-        mapping = {4800:1, 9600:2, 19200:3}
-        if rate not in mapping:
-            raise ValueError("Invalid baud rate.")
-        self.modify_data_register(0x18, [mapping[rate]])
-
-    def restore_factory_settings(self):
-        self.modify_switch_value(0x03, True)
-
-    def clear_display_value(self):
-        self.modify_switch_value(0x00, True)
-
-    def read_weight_value(self):
-        # Read the “weight” from register 0x00
-        return self.read_data_register(0x00)
 
 # ----------------------------------------------------
 # PIDController, Enums, Constants (unchanged)
@@ -152,30 +93,34 @@ class PIDController:
         self.prev_derivative = 0.0
         self.last_time = time.monotonic()
 
+
 class Mode(Enum):
     IDLE = 0
     RUN_CONTINUOUS = 2
     PID_SPEED = 6
     HOMING = 8
 
+
 class Direction(Enum):
     IDLE = 0
     FW = 2
     BW = 1
 
+
 # MotorSystem constants
-BROKER_IP   = "192.168.2.1"
-DEVICE_ID   = "lcu"
-MOTOR_PINS  = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
-ENC_A, ENC_B = 20, 21
-PULSES_PER_MM = 33
-HOMING_SPEED  = 50
-HOMING_TIMEOUT = 10.0
+BROKER_IP       = "192.168.2.1"
+DEVICE_ID       = "lcu"
+MOTOR_PINS      = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
+ENC_A, ENC_B    = 20, 21
+PULSES_PER_MM   = 33
+HOMING_SPEED    = 50
+HOMING_TIMEOUT  = 10.0
 MAX_HOMING_RETRIES = 3
 PID_UPDATE_INTERVAL = 0.001
 
+
 # ----------------------------------------------------
-# MotorSystem Class (with LoadCell usage simplified)
+# MotorSystem Class (with LoadCellDriver integration)
 # ----------------------------------------------------
 class MotorSystem:
     def __init__(self):
@@ -217,13 +162,21 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-        # Load cell
-        self.load_cell = LoadCellAmplifier(port='/dev/ttyUSB0', baudrate=9600, slave_address=0x01)
-        try:
-            self.load_cell.connect()
+        # Load cell (using revised driver)
+        self.load_cell = LoadCellDriver(
+            port="/dev/ttyUSB0",
+            baudrate=9600,
+            parity='N',
+            stopbits=1,
+            bytesize=8,
+            timeout=1,
+            slave_id=1,
+            scale_factor=100
+        )
+        if self.load_cell.connect():
             print("Load cell connected")
-        except Exception as e:
-            print(f"Load cell connection failed: {e}")
+        else:
+            print("Load cell connection failed")
 
         # Logger
         self.logger = HighSpeedLogger()
@@ -236,11 +189,11 @@ class MotorSystem:
     def _encoder_callback(self, gpio, level, tick):
         A = self.pi.read(ENC_A)
         B = self.pi.read(ENC_B)
-        delta = (-1 if gpio==ENC_A and A==B else 1) if gpio==ENC_A else (-1 if A!=B else 1)
+        delta = (-1 if gpio == ENC_A and A == B else 1) if gpio == ENC_A else (-1 if A != B else 1)
         self.encoder_pos += delta
 
     def control_motor(self, duty_percent, direction):
-        duty = int(1_000_000 * max(min(duty_percent, 100),0) / 100)
+        duty = int(1_000_000 * max(min(duty_percent, 100), 0) / 100)
         self.pi.write(MOTOR_PINS["REN"], 1)
         self.pi.write(MOTOR_PINS["LEN"], 1)
         if direction == Direction.FW:
@@ -287,10 +240,10 @@ class MotorSystem:
                     print("ERROR: Not homed")
                     self.mode = Mode.IDLE
                 elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
-                    ref = tgt if direction==Direction.FW else -tgt
+                    ref = tgt if direction == Direction.FW else -tgt
                     out = self.speed_pid.compute(ref, self.current_speed)
                     duty = abs(out)
-                    dir_ = Direction.FW if out>=0 else Direction.BW
+                    dir_ = Direction.FW if out >= 0 else Direction.BW
                     self.control_motor(duty, dir_)
                     self.last_pid_update = now
             elif mode == Mode.RUN_CONTINUOUS:
@@ -338,18 +291,19 @@ class MotorSystem:
             pos_in    = pos_mm / 25.4
             load_val  = 0.0
             try:
-                load_val = self.load_cell.read_weight_value()
-            except:
+                # read two registers (signed), scaled by scale_factor
+                load_val = self.load_cell.read_parameter(0x00, length=2, signed=True) or 0.0
+            except Exception:
                 pass
 
             data = {
                 "timestamp": time.monotonic(),
                 "pos_ticks": pos_ticks,
-                "pos_mm": round(pos_mm,3),
-                "pos_inches": round(pos_in,3),
+                "pos_mm": round(pos_mm, 3),
+                "pos_inches": round(pos_in, 3),
                 "current": 0.0,
                 "load": load_val,
-                "current_speed": round(self.current_speed,3)
+                "current_speed": round(self.current_speed, 3)
             }
 
             self.logger.log(data)
@@ -364,6 +318,7 @@ class MotorSystem:
         self.client.loop_stop()
         self.pi.stop()
         self.load_cell.disconnect()
+
 
 if __name__ == "__main__":
     system = MotorSystem()
