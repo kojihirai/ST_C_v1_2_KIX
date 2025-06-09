@@ -195,7 +195,11 @@ class MotorController:
                 self.stop_motor()
 
             elif self.mode == Mode.RUN_CONTINUOUS:
-                self.set_motor(self.target)
+
+
+                # scale target from 0 to 24 to 0 to 100
+                target = self.target * 100 / 24
+                self.set_motor(target)
             
             else:
                 pass
