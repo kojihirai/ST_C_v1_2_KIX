@@ -9,8 +9,6 @@ from queue import Queue
 import paho.mqtt.client as mqtt
 import pigpio
 from pymodbus.client import ModbusSerialClient
-from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadBuilder, BinaryPayloadDecoder
 
 # ----------------------------------------------------
 # HighSpeedLogger Class
@@ -62,99 +60,42 @@ class HighSpeedLogger:
         self.file.close()
 
 # ----------------------------------------------------
-# LoadCellAmplifier Class
+# LoadCell Class
 # ----------------------------------------------------
-class LoadCellAmplifier:
-    def __init__(self, port, baudrate=9600, slave_address=0x01, parity='N', stopbits=1, bytesize=8, timeout=1):
+class LoadCell:
+    def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
         self.client = ModbusSerialClient(
-            port=port,
-            baudrate=baudrate,
-            parity=parity,
-            stopbits=stopbits,
-            bytesize=bytesize,
-            timeout=timeout
+            port=port, baudrate=baudrate, parity=parity,
+            stopbits=stopbits, bytesize=bytesize, timeout=timeout
         )
-        self.slave_address = slave_address
-        self.connected = False
-    
-    def connect(self):
-        if not self.client.connect():
-            raise ConnectionError("Unable to connect to the Modbus device")
-        self.connected = True
-    
-    def disconnect(self):
-        self.client.close()
-        self.connected = False
+        self.slave_id = slave_id
+        try:
+            self.connected = self.client.connect()
+        except Exception as e:
+            print(f"Modbus connect error: {e}")
+            self.connected = False
 
-    def read_data_register(self, address):
-        # Function code 0x03: Read data register
-        result = self.client.read_holding_registers(address, 1, slave=self.slave_address)
-        if not result.isError():
-            return result.registers[0]
-        else:
-            raise Exception(f"Error reading register at address {address}: {result}")
-    
-    def modify_switch_value(self, address, value):
-        # Function code 0x05: Modify switch value (Quickly modify switch value)
-        result = self.client.write_coil(address, value, slave=self.slave_address)
-        if result.isError():
-            raise Exception(f"Error modifying switch value at address {address}: {result}")
+    def __del__(self):
+        try:
+            self.client.close()
+        except:
+            pass
 
-    def modify_data_register(self, start_address, values):
-        # Function code 0x10: Modify multi-bit data register value
-        builder = BinaryPayloadBuilder(byteorder=Endian.Big)
-        for value in values:
-            builder.add_16bit_int(value)
-        
-        payload = builder.to_registers()
-        result = self.client.write_registers(start_address, payload, slave=self.slave_address)
-        if result.isError():
-            raise Exception(f"Error modifying data register at address {start_address}: {result}")
-    
-    def zero_calibration(self):
-        # Write zero calibration value (Address 0x00H, Function code 0x03 or 0x10)
-        self.modify_data_register(0x00, [0x0000])
-
-    def set_baud_rate(self, rate):
-        # Set baud rate (Address 0x18H, Function code 0x03 or 0x10)
-        baud_rate_mapping = {4800: 1, 9600: 2, 19200: 3}
-        if rate not in baud_rate_mapping:
-            raise ValueError("Invalid baud rate. Choose from 4800, 9600, or 19200.")
-        
-        self.modify_data_register(0x18, [baud_rate_mapping[rate]])
-
-    def restore_factory_settings(self):
-        # Restore factory setting (Address 0x03H, Function code 0x05 or 0x10, write FF)
-        self.modify_switch_value(0x03, True)  # Writing FF as True in this context
-
-    def clear_display_value(self):
-        # Clear display value (Address 0x00H, Function code 0x05 or 0x10, write FF)
-        self.modify_switch_value(0x00, True)  # Writing FF as True in this context
-    
-    def read_weight_value(self):
-        # Current weight value (Address 0x00H, Function code 0x03)
-        return self.read_data_register(0x00)
+    def decode_i32(self, registers):
+        raw = (registers[0] << 16) | registers[1]
+        return struct.unpack('>i', struct.pack('>I', raw))[0]
 
     def read_load_value(self):
-        """Reads the load value from the load cell."""
-        try:
-            return self.read_weight_value()
-        except Exception as e:
-            print(f"Error reading load value: {e}")
-            return None
+        result = self.client.read_input_registers(address=4, count=2, slave=self.slave_id)
+        if not result.isError():
+            return self.decode_i32(result.registers)
+        return None
 
     def read_status_flags(self):
-        """Reads 'hold' and 'stable' status bits."""
-        try:
-            # Read status register (assuming it's at address 0x01)
-            status = self.read_data_register(0x01)
-            # Assuming bit 0 is hold and bit 1 is stable
-            hold = bool(status & 0x01)
-            stable = bool(status & 0x02)
-            return hold, stable
-        except Exception as e:
-            print(f"Error reading status flags: {e}")
-            return None, None
+        result = self.client.read_discrete_inputs(address=0, count=2, slave=self.slave_id)
+        if not result.isError():
+            return result.bits[0], result.bits[1]
+        return None, None
 
 # ----------------------------------------------------
 # PIDController Class
@@ -209,7 +150,9 @@ class Direction(Enum):
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "lcu"
 MAX_CURRENT = 5.0
+# MOTOR_PINS = {"RPWM": 12, "LPWM": 13, "REN": 23, "LEN": 24}
 MOTOR_PINS = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
+# ENC_A, ENC_B = 5, 6
 ENC_A, ENC_B = 20, 21
 PULSES_PER_MM = 33
 ERROR_TOLERANCE = 0.002
@@ -257,23 +200,7 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-        # Initialize load cell with proper parameters
-        self.load_cell = LoadCellAmplifier(
-            port='/dev/ttyUSB0',
-            baudrate=9600,
-            slave_address=0x01,
-            parity='E',
-            stopbits=1,
-            bytesize=8,
-            timeout=1
-        )
-        try:
-            self.load_cell.connect()
-            print("Load cell connected successfully")
-        except Exception as e:
-            print(f"Failed to connect to load cell: {e}")
-            self.load_cell.connected = False
-
+        self.load_cell = LoadCell('/dev/ttyUSB0', 9600, 'E', 1, 8, 1, 1)
         self.logger = HighSpeedLogger()
 
         self.running = True
@@ -424,7 +351,6 @@ class MotorSystem:
         self.client.loop_stop()
         self.pi.stop()
         if hasattr(self, 'load_cell'):
-            self.load_cell.disconnect()
             del self.load_cell
 
 if __name__ == "__main__":
