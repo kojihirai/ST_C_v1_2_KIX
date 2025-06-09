@@ -264,10 +264,12 @@ class MotorSystem:
             if mode == Mode.HOMING:
                 self._do_homing()
 
-            elif mode == Mode.PID_SPEED:
+            elif mode == Mode.RUN_CONTINUOUS:
                 if not self.is_homed:
-                    print("ERROR: Not homed")
-                    self.mode = Mode.IDLE
+                    self._do_homing()
+                    print("Homing complete")
+                    self.is_homed = True
+                    self.homing_in_progress = False
                 elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
                     ref = targ if dir == Direction.FW else -targ
                     out = self.speed_pid.compute(ref, self.current_speed)
@@ -276,8 +278,8 @@ class MotorSystem:
                     self.control_motor(duty, direction)
                     self.last_pid_update = now
 
-            elif mode == Mode.RUN_CONTINUOUS:
-                self.control_motor(targ, dir)
+            # elif mode == Mode.RUN_CONTINUOUS:
+            #     self.control_motor(targ, dir)
 
             elif mode == Mode.IDLE:
                 self.control_motor(0, Direction.IDLE)
@@ -314,7 +316,7 @@ class MotorSystem:
                 print("Homing complete")
                 return
             else:
-                print(f"Homing attempt {attempt+1} failed, retrying...")
+                print(f"⚠️ Homing attempt {attempt+1} failed, retrying...")
 
         print("Homing failed after max retries")
         self.homing_in_progress = False
