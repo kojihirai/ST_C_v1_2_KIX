@@ -314,7 +314,7 @@ class MotorSystem:
                 print("Homing complete")
                 return
             else:
-                print(f"⚠️ Homing attempt {attempt+1} failed, retrying...")
+                print(f"Homing attempt {attempt+1} failed, retrying...")
 
         print("Homing failed after max retries")
         self.homing_in_progress = False

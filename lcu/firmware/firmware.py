@@ -279,6 +279,18 @@ class MotorSystem:
         threading.Thread(target=self.run_loop, daemon=True).start()
         threading.Thread(target=self.send_data_loop, daemon=True).start()
 
+        # Auto-home if not homed
+        if not self.is_homed:
+            print("System not homed. Starting auto-homing sequence...")
+            self.mode = Mode.HOMING
+            # Wait for homing to complete
+            while self.homing_in_progress:
+                time.sleep(0.1)
+            if not self.is_homed:
+                print("Warning: Auto-homing failed")
+            else:
+                print("Auto-homing completed successfully")
+
     def _encoder_callback(self, gpio, level, tick):
         A = self.pi.read(ENC_A)
         B = self.pi.read(ENC_B)
