@@ -14,7 +14,7 @@ ENC_A = 5
 ENC_B = 6
 
 # Constants
-PULSES_PER_MM = 33
+PULSES_PER_MM = 72
 PWM_FREQ = 20000
 SPEED_SAMPLE_INTERVAL_MS = 50
 MAX_SPEED_MMPS = 9.144
@@ -52,7 +52,7 @@ def get_position_ticks():
     return position - offset
 
 def get_speed_mmps(prev_ticks, new_ticks, dt_sec):
-    return (new_ticks - prev_ticks) / PULSES_PER_MM / dt_sec / 2
+    return (new_ticks - prev_ticks) / PULSES_PER_MM / dt_sec
 
 def stop_motor():
     pi.hardware_PWM(RPWM, 0, 0)
