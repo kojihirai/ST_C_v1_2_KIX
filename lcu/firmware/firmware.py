@@ -9,10 +9,106 @@ from queue import Queue
 import paho.mqtt.client as mqtt
 import pigpio
 
-from LoadCell_Driver import LoadCellDriver  # updated import
+# ----------------------------------------------------
+# Inlined LoadCellDriver (from LoadCell_Driver.py)
+# ----------------------------------------------------
 from pymodbus.client import ModbusSerialClient
-from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadBuilder
+from pymodbus.exceptions import ModbusException
+
+class LoadCellDriver:
+    def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id, scale_factor=100):
+        self.client = ModbusSerialClient(
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,
+            parity=parity,
+            stopbits=stopbits,
+            bytesize=bytesize
+        )
+        self.slave_id = slave_id
+        self.connected = False
+        self.scale_factor = scale_factor
+
+    def __del__(self):
+        try:
+            self.client.close()
+        except:
+            pass
+
+    def connect(self):
+        try:
+            self.connected = self.client.connect()
+            return self.connected
+        except Exception as e:
+            print(f"Failed to connect: {e}")
+            return False
+
+    def disconnect(self):
+        try:
+            self.client.close()
+            self.connected = False
+            print("Successfully disconnected")
+        except Exception as e:
+            print(f"Failed to disconnect: {e}")
+
+    def read_parameter(self, address, length=1, signed=False):
+        """
+        Reads `length` registers starting at `address`, unpacks as signed if requested,
+        then divides by scale_factor to apply the 1/100 scaling.
+        """
+        if not self.connected:
+            print("Not connected")
+            return None
+
+        try:
+            response = self.client.read_holding_registers(address=address, count=length, slave=self.slave_id)
+            if response.isError():
+                print(f"Failed to read parameter at address {hex(address)}")
+                return None
+
+            # unpack raw value
+            if length == 1:
+                raw = response.registers[0]
+                if signed:
+                    raw = struct.unpack('>h', struct.pack('>H', raw))[0]
+            else:  # length == 2
+                raw = (response.registers[0] << 16) | response.registers[1]
+                if signed:
+                    raw = struct.unpack('>i', struct.pack('>I', raw))[0]
+
+            scaled = raw / self.scale_factor
+            # Debug print removed or kept as desired:
+            print(f"Read {raw} from {hex(address)} → scaled: {scaled}")
+            return scaled
+
+        except ModbusException as e:
+            print(f"ModbusException at {hex(address)}: {e}")
+        except Exception as e:
+            print(f"Unexpected error at {hex(address)}: {e}")
+        return None
+
+    def write_parameter(self, address, value):
+        """
+        Writes a single register. `value` should be the unscaled integer.
+        """
+        if not self.connected:
+            print("Not connected")
+            return False
+
+        try:
+            response = self.client.write_register(address, int(value), slave=self.slave_id)
+            if response.isError():
+                print(f"Failed to write {value} to {hex(address)}")
+                return False
+            print(f"Wrote {value} to {hex(address)}")
+            return True
+
+        except ModbusException as e:
+            print(f"ModbusException at {hex(address)}: {e}")
+        except Exception as e:
+            print(f"Unexpected error at {hex(address)}: {e}")
+        return False
+
 
 # ----------------------------------------------------
 # HighSpeedLogger Class (unchanged)
@@ -108,19 +204,19 @@ class Direction(Enum):
 
 
 # MotorSystem constants
-BROKER_IP       = "192.168.2.1"
-DEVICE_ID       = "lcu"
-MOTOR_PINS      = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
-ENC_A, ENC_B    = 20, 21
-PULSES_PER_MM   = 33
-HOMING_SPEED    = 50
-HOMING_TIMEOUT  = 10.0
-MAX_HOMING_RETRIES = 3
+BROKER_IP           = "192.168.2.1"
+DEVICE_ID           = "lcu"
+MOTOR_PINS          = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
+ENC_A, ENC_B        = 20, 21
+PULSES_PER_MM       = 33
+HOMING_SPEED        = 50
+HOMING_TIMEOUT      = 10.0
+MAX_HOMING_RETRIES  = 3
 PID_UPDATE_INTERVAL = 0.001
 
 
 # ----------------------------------------------------
-# MotorSystem Class (with LoadCellDriver integration)
+# MotorSystem Class
 # ----------------------------------------------------
 class MotorSystem:
     def __init__(self):
@@ -162,7 +258,7 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-        # Load cell (using revised driver)
+        # Load cell
         self.load_cell = LoadCellDriver(
             port="/dev/ttyUSB0",
             baudrate=9600,
@@ -291,7 +387,6 @@ class MotorSystem:
             pos_in    = pos_mm / 25.4
             load_val  = 0.0
             try:
-                # read two registers (signed), scaled by scale_factor
                 load_val = self.load_cell.read_parameter(0x00, length=2, signed=True) or 0.0
             except Exception:
                 pass
