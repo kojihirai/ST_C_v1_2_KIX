@@ -52,7 +52,7 @@ def get_position_ticks():
     return position - offset
 
 def get_speed_mmps(prev_ticks, new_ticks, dt_sec):
-    return (new_ticks - prev_ticks) / PULSES_PER_MM / dt_sec
+    return (new_ticks - prev_ticks) / PULSES_PER_MM / dt_sec / 2
 
 def stop_motor():
     pi.hardware_PWM(RPWM, 0, 0)
