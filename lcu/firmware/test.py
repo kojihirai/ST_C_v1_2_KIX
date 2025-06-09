@@ -52,7 +52,7 @@ class LoadCellDriver:
     def read_parameter(self, address, length=1, signed=False):
         try:
             # Read holding registers
-            response = self.client.read_holding_registers(address, length)
+            response = self.client.read_holding_registers(address=address, count=length)
             if not response.isError():
                 if length == 1:
                     # 16-bit register
