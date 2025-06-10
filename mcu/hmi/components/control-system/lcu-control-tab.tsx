@@ -9,8 +9,8 @@ import { LcuDirection } from "@/lib/constants"
 const INPUT_RANGES = {
   speed: {
     min: 0,
-    max: 100,
-    step: 1,
+    max: 15,
+    step: 0.01,
     label: "Speed Target (mm/s)"
   }
 } as const
