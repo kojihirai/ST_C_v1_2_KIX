@@ -328,7 +328,7 @@ class MotorSystem:
 
             if mode == Mode.HOMING:
                 self._do_homing()
-            elif mode == Mode.PID_SPEED:
+            elif mode == Mode.RUN_CONTINUOUS:
                 if not self.is_homed:
                     print("ERROR: Not homed")
                     self.mode = Mode.IDLE
@@ -339,8 +339,8 @@ class MotorSystem:
                     dir_ = Direction.FW if out >= 0 else Direction.BW
                     self.control_motor(duty, dir_)
                     self.last_pid_update = now
-            elif mode == Mode.RUN_CONTINUOUS:
-                self.control_motor(tgt, direction)
+            # elif mode == Mode.RUN_CONTINUOUS:
+            #     self.control_motor(tgt, direction)
             else:
                 self.control_motor(0, Direction.IDLE)
 
