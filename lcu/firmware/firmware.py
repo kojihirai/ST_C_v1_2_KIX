@@ -400,13 +400,13 @@ class MotorSystem:
             with self.state_lock:
                 mode, direction, tgt = self.mode, self.direction, self.target
 
-            if mode == Mode.HOMING:
+            if mode == Mode.HOMING or not self.is_homed:
+                if not self.homing_in_progress:
+                    print("System not homed - initiating homing sequence")
+                    self.mode = Mode.HOMING
                 self._do_homing()
             elif mode == Mode.RUN_CONTINUOUS:
-                if not self.is_homed:
-                    print("ERROR: Not homed")
-                    self.mode = Mode.IDLE
-                elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
+                if now - self.last_pid_update >= PID_UPDATE_INTERVAL:
                     ref = tgt if direction == Direction.FW else -tgt
                     out = self.speed_pid.compute(ref, self.current_speed)
                     duty = abs(out)
