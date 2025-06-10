@@ -157,17 +157,18 @@ export function ProjectParametersTable({
                   <h3 className="text-sm font-medium mb-4">Linear Actuator Control</h3>
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-xs font-medium mb-1">Setpoint (mm)</h4>
+                      <h4 className="text-xs font-medium mb-1">Setpoint (mm/s)</h4>
                       <div className="flex items-center gap-2">
                         <input 
                           type="range" 
                           min="0" 
-                          max="100" 
+                          max="15" 
+                          step="0.01"
                           value={controls.linearActuator?.setpoint || 0} 
                           className="w-full"
                           readOnly
                         />
-                        <span className="text-sm">{controls.linearActuator?.setpoint || 0}mm</span>
+                        <span className="text-sm">{controls.linearActuator?.setpoint || 0}mm/s</span>
                       </div>
                     </div>
                     <div>
