@@ -418,12 +418,13 @@ export function ProjectForm({ project: initialProject }: ProjectFormProps = {}) 
                         <Input
                           type="number"
                           min={0}
-                          max={100}
+                          max={15}
+                          step={0.01}
                           {...field}
                           onChange={(e) => field.onChange(Number(e.target.value))}
                         />
                       </FormControl>
-                      <FormDescription>Set the linear actuator speed in millimeters per second (0-100 mm/s).</FormDescription>
+                      <FormDescription>Set the linear actuator speed in millimeters per second (0-15 mm/s).</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
