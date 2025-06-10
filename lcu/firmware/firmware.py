@@ -171,7 +171,13 @@ class PIDController:
         self.last_time = now
 
         error = setpoint - measured
-        self.integral = max(min(self.integral + error * dt, self.integral_limit), -self.integral_limit)
+        if abs(error) < ERROR_TOLERANCE:
+            error = 0.0
+            self.integral *= 0.90
+        else:
+            self.integral += error * dt
+
+        self.integral = max(min(self.integral, INTEGRAL_MAX), INTEGRAL_MIN)
         derivative = (error - self.prev_error) / dt
         filtered_d = (self.derivative_filter * derivative +
                       (1 - self.derivative_filter) * self.prev_derivative)
@@ -205,10 +211,19 @@ BROKER_IP           = "192.168.2.1"
 DEVICE_ID           = "lcu"
 MOTOR_PINS          = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
 ENC_A, ENC_B        = 20, 21
-PULSES_PER_MM       = 33
-HOMING_SPEED        = 50
-HOMING_TIMEOUT      = 10.0
-MAX_HOMING_RETRIES  = 3
+PULSES_PER_MM       = 110
+PWM_FREQ           = 20000
+SPEED_SAMPLE_INTERVAL_MS = 50
+MAX_SPEED_MMPS     = 9.144
+SPEED_WINDOW       = 10
+INTEGRAL_MAX       = 5.0
+INTEGRAL_MIN       = -5.0
+DUTY_MIN           = 5.0
+DUTY_MAX           = 100.0
+ERROR_TOLERANCE    = 0.002
+HOMING_SPEED       = 50
+HOMING_TIMEOUT     = 15.0
+MAX_HOMING_RETRIES = 3
 PID_UPDATE_INTERVAL = 0.001
 
 
@@ -229,6 +244,7 @@ class MotorSystem:
         self.direction = Direction.IDLE
         self.target = 0.0
         self.encoder_pos = 0
+        self.offset = 0
         self.last_encoder_pos = 0
         self.current_speed = 0.0
         self.is_homed = False
@@ -236,9 +252,11 @@ class MotorSystem:
         self.last_speed_time = time.monotonic()
         self.last_pid_update = 0.0
         self.state_lock = threading.Lock()
+        self.tick_history = [0] * SPEED_WINDOW
+        self.tick_index = 0
 
         # PID
-        self.speed_pid = PIDController(2.0, 0.05, 0.2, 50.0, 0.2)
+        self.speed_pid = PIDController(8.0, 1.0, 0.3, 50.0, 0.2)
 
         # GPIO & Encoder
         self.pi = pigpio.pi()
@@ -282,22 +300,34 @@ class MotorSystem:
     def _encoder_callback(self, gpio, level, tick):
         A = self.pi.read(ENC_A)
         B = self.pi.read(ENC_B)
-        delta = (-1 if gpio == ENC_A and A == B else 1) if gpio == ENC_A else (-1 if A != B else 1)
+        delta = 0
+
+        if gpio == ENC_A:
+            delta = -1 if A == B else 1
+        elif gpio == ENC_B:
+            delta = -1 if A != B else 1
+
         self.encoder_pos += delta
 
+    def get_position_ticks(self):
+        return self.encoder_pos - self.offset
+
+    def get_speed_mmps(self, prev_ticks, new_ticks, dt_sec):
+        return (new_ticks - prev_ticks) / PULSES_PER_MM / dt_sec
+
     def control_motor(self, duty_percent, direction):
-        duty = int(1_000_000 * max(min(duty_percent, 100), 0) / 100)
+        duty = int(1_000_000 * max(min(duty_percent, DUTY_MAX), DUTY_MIN) / 100)
         self.pi.write(MOTOR_PINS["REN"], 1)
         self.pi.write(MOTOR_PINS["LEN"], 1)
         if direction == Direction.FW:
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 20000, 0)
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 20000, duty)
+            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, duty)
         elif direction == Direction.BW:
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 20000, 0)
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 20000, duty)
+            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, duty)
         else:
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], 20000, 0)
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], 20000, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
 
     def on_message(self, client, userdata, msg):
         try:
@@ -313,14 +343,58 @@ class MotorSystem:
         except Exception as e:
             print(f"MQTT parse error: {e}")
 
+    def _do_homing(self):
+        if self.homing_in_progress:
+            return
+        self.homing_in_progress = True
+        print("=== Homing (retracting) ===")
+        check_interval = 0.01
+        required_still_cycles = 50
+        still_counter = 0
+        last_pos = self.encoder_pos
+        start = time.time()
+
+        self.control_motor(HOMING_SPEED, Direction.BW)
+
+        while time.time() - start < HOMING_TIMEOUT:
+            time.sleep(check_interval)
+            curr_pos = self.encoder_pos
+            delta = abs(curr_pos - last_pos)
+
+            print(f"  Homing... encoder: {curr_pos} | delta: {delta}")
+            if delta == 0:
+                still_counter += 1
+            else:
+                still_counter = 0
+            last_pos = curr_pos
+
+            if still_counter >= required_still_cycles:
+                print("Encoder stable — assuming hard stop.")
+                break
+
+        self.control_motor(0, Direction.IDLE)
+        time.sleep(0.3)
+        if abs(self.encoder_pos - last_pos) > 0:
+            print("Movement detected after stop. Retrying...")
+            self.homing_in_progress = False
+            return self._do_homing()
+
+        self.offset = self.encoder_pos
+        print(f"[HOME] Final encoder ticks: {self.offset}")
+        print("Homing complete. Encoder virtual zero set.")
+        self.is_homed = True
+        self.homing_in_progress = False
+
     def run_loop(self):
         while self.running:
             now = time.monotonic()
             dt = now - self.last_speed_time
             if dt > 0:
-                delta = self.encoder_pos - self.last_encoder_pos
-                self.current_speed = (delta / PULSES_PER_MM) / dt
-                self.last_encoder_pos = self.encoder_pos
+                curr_ticks = self.get_position_ticks()
+                avg_speed = self.get_speed_mmps(self.tick_history[self.tick_index], curr_ticks, dt * SPEED_WINDOW)
+                self.tick_history[self.tick_index] = curr_ticks
+                self.tick_index = (self.tick_index + 1) % SPEED_WINDOW
+                self.current_speed = avg_speed
                 self.last_speed_time = now
 
             with self.state_lock:
@@ -339,43 +413,10 @@ class MotorSystem:
                     dir_ = Direction.FW if out >= 0 else Direction.BW
                     self.control_motor(duty, dir_)
                     self.last_pid_update = now
-            # elif mode == Mode.RUN_CONTINUOUS:
-            #     self.control_motor(tgt, direction)
             else:
                 self.control_motor(0, Direction.IDLE)
 
             time.sleep(0.001)
-
-    def _do_homing(self):
-        if self.homing_in_progress:
-            return
-        self.homing_in_progress = True
-        for attempt in range(MAX_HOMING_RETRIES):
-            start_pos = self.encoder_pos
-            still = 0
-            t0 = time.monotonic()
-            self.control_motor(HOMING_SPEED, Direction.BW)
-            while time.monotonic() - t0 < HOMING_TIMEOUT:
-                time.sleep(0.005)
-                if abs(self.encoder_pos - start_pos) == 0:
-                    still += 1
-                else:
-                    still = 0
-                start_pos = self.encoder_pos
-                if still >= 10:
-                    break
-            self.control_motor(0, Direction.IDLE)
-            time.sleep(0.3)
-            if still >= 10:
-                self.encoder_pos = 0
-                self.is_homed = True
-                print("Homing complete")
-                break
-            else:
-                print(f"Homing attempt {attempt+1} failed")
-        else:
-            print("Homing failed")
-        self.homing_in_progress = False
 
     def send_data_loop(self):
         while self.running:
