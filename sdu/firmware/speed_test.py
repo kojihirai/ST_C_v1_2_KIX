@@ -2,42 +2,64 @@ import serial
 import time
 from collections import deque
 import statistics
+import os
+
+# Set process priority to maximum
+os.nice(-20)  # Requires sudo privileges
 
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 115200
-WINDOW_SIZE = 100  # Number of samples to use for SPS calculation
+WINDOW_SIZE = 100
+BUFFER_SIZE = 1024  # Increased buffer size
 
 def main():
     try:
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0)  # Non-blocking mode
-        time.sleep(2)  # Wait for connection to stabilize
+        # Configure serial port for maximum performance
+        ser = serial.Serial(
+            port=SERIAL_PORT,
+            baudrate=BAUD_RATE,
+            timeout=0,  # Non-blocking
+            write_timeout=0,
+            inter_byte_timeout=None,
+            exclusive=True  # Exclusive access to port
+        )
+        
+        # Set buffer sizes
+        ser.set_buffer_size(rx_size=BUFFER_SIZE, tx_size=BUFFER_SIZE)
         
         # Use deque for efficient rolling window of timestamps
         timestamps = deque(maxlen=WINDOW_SIZE)
         start_time = time.time()
         sample_count = 0
+        last_print_time = start_time
         
         print("Starting speed test...")
         print("Press Ctrl+C to stop and see results")
         
         while True:
             if ser.in_waiting:
-                line = ser.readline()
-                if line:
-                    current_time = time.time()
-                    timestamps.append(current_time)
-                    sample_count += 1
-                    
-                    # Calculate and display SPS every 100 samples
-                    if sample_count % 100 == 0:
-                        if len(timestamps) > 1:
-                            intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
-                            avg_interval = statistics.mean(intervals)
-                            current_sps = 1.0 / avg_interval if avg_interval > 0 else 0
-                            print(f"\rCurrent SPS: {current_sps:.1f}", end="", flush=True)
+                # Read all available data at once
+                data = ser.read(ser.in_waiting)
+                lines = data.split(b'\n')
+                
+                for line in lines:
+                    if line:  # Skip empty lines
+                        current_time = time.time()
+                        timestamps.append(current_time)
+                        sample_count += 1
+                
+                # Update display every 0.1 seconds instead of every 100 samples
+                current_time = time.time()
+                if current_time - last_print_time >= 0.1:
+                    if len(timestamps) > 1:
+                        intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
+                        avg_interval = statistics.mean(intervals)
+                        current_sps = 1.0 / avg_interval if avg_interval > 0 else 0
+                        print(f"\rCurrent SPS: {current_sps:.1f}", end="", flush=True)
+                    last_print_time = current_time
             
-            # Small sleep to prevent CPU hogging
-            time.sleep(0.0001)
+            # Reduced sleep time for more frequent checks
+            time.sleep(0.00001)
             
     except serial.SerialException as e:
         print(f"\nSerial error: {e}")
