@@ -5,54 +5,57 @@ import statistics
 import os
 import struct
 
-# Set process priority to maximum
-os.nice(-20)  # Requires sudo privileges
+# Set process priority to maximum (optional, needs sudo)
+try:
+    os.nice(-20)
+except PermissionError:
+    pass  # Not fatal if not run with sudo
 
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 2000000
 WINDOW_SIZE = 100
-MESSAGE_SIZE = 12  # 3 floats (4 bytes each) - removed newline
-BATCH_SIZE = 100  # Process multiple messages at once
+MESSAGE_SIZE = 6  # 3 x int16 = 6 bytes
+BATCH_SIZE = 100
+AMP_SCALE = 100.0  # Integer was scaled by 100 (0.01A resolution)
 
 def main():
     try:
-        # Configure serial port for maximum performance
         ser = serial.Serial(
             port=SERIAL_PORT,
             baudrate=BAUD_RATE,
-            timeout=0,  # Non-blocking
+            timeout=0,
             write_timeout=0,
             inter_byte_timeout=None,
-            exclusive=True  # Exclusive access to port
+            exclusive=True
         )
         
-        # Use deque for efficient rolling window of timestamps
         timestamps = deque(maxlen=WINDOW_SIZE)
         start_time = time.time()
         sample_count = 0
         last_print_time = start_time
         last_values = None
-        
+
         print("Starting speed test...")
         print("Press Ctrl+C to stop and see results")
         
         while True:
             if ser.in_waiting >= MESSAGE_SIZE * BATCH_SIZE:
-                # Read multiple messages at once
                 data = ser.read(MESSAGE_SIZE * BATCH_SIZE)
                 current_time = time.time()
                 
-                # Process all messages in the batch
                 for i in range(0, len(data), MESSAGE_SIZE):
                     message = data[i:i+MESSAGE_SIZE]
                     if len(message) == MESSAGE_SIZE:
-                        # Unpack 3 float values
-                        drill, power, linear = struct.unpack('fff', message)
+                        # Unpack as 3 signed int16s
+                        raw_drill, raw_power, raw_linear = struct.unpack('<hhh', message)
+                        drill = raw_drill / AMP_SCALE
+                        power = raw_power / AMP_SCALE
+                        linear = raw_linear / AMP_SCALE
+
                         timestamps.append(current_time)
                         sample_count += 1
                         last_values = (drill, power, linear)
                 
-                # Update display every 0.1 seconds
                 if current_time - last_print_time >= 0.1:
                     if len(timestamps) > 1:
                         intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
@@ -61,10 +64,9 @@ def main():
                         if last_values:
                             print(f"\rCurrent SPS: {current_sps:.1f} | Drill: {last_values[0]:.2f}A Power: {last_values[1]:.2f}A Linear: {last_values[2]:.2f}A", end="", flush=True)
                     last_print_time = current_time
-            
-            # Reduced sleep time for more frequent checks
-            time.sleep(0.000001)  # Reduced sleep time
-            
+
+            time.sleep(0.000001)  # Minimized delay for max responsiveness
+
     except serial.SerialException as e:
         print(f"\nSerial error: {e}")
     except KeyboardInterrupt:

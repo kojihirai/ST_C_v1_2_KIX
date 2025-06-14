@@ -2,16 +2,23 @@ const int DRILL_CURRENT_PIN  = A6;
 const int POWER_CURRENT_PIN  = A7;
 const int LINEAR_CURRENT_PIN = A8;
 
-const float VREF         = 3.3f;
-const int   ADC_MAX      = 4095;
-const float SENS_DRILL   = 0.1f; 
-const float SENS_POWER   = 0.1f;
-const float SENS_LINEAR  = 0.1875f;
-
+// ADC config
+const float VREF    = 3.3f;
+const int   ADC_MAX = 4095;
 const float ADC_TO_VOLT = VREF / ADC_MAX;
-const float DRILL_TO_AMP = ADC_TO_VOLT / SENS_DRILL;
-const float POWER_TO_AMP = ADC_TO_VOLT / SENS_POWER;
-const float LINEAR_TO_AMP = ADC_TO_VOLT / SENS_LINEAR;
+
+// Sensor sensitivities (V/A)
+const float SENS_DRILL  = 0.1f;
+const float SENS_POWER  = 0.1f;
+const float SENS_LINEAR = 0.1875f;
+
+// Output scaling
+const float AMP_SCALE = 100.0f;  // 0.01 A resolution
+
+// === Precomputed int16 scaling factors ===
+const float SCALE_DRILL  = ADC_TO_VOLT / SENS_DRILL  * AMP_SCALE;
+const float SCALE_POWER  = ADC_TO_VOLT / SENS_POWER  * AMP_SCALE;
+const float SCALE_LINEAR = ADC_TO_VOLT / SENS_LINEAR * AMP_SCALE;
 
 void setup() {
   Serial.begin(2000000);
@@ -20,17 +27,13 @@ void setup() {
   while (!Serial);
 }
 
+inline void send_scaled(int pin, float scale) {
+  int16_t value = analogRead(pin) * scale;
+  Serial.write((uint8_t*)&value, sizeof(int16_t));
+}
+
 void loop() {
-  uint16_t rawDrill  = analogRead(DRILL_CURRENT_PIN);
-  uint16_t rawPower  = analogRead(POWER_CURRENT_PIN);
-  uint16_t rawLinear = analogRead(LINEAR_CURRENT_PIN);
-
-  float currDrill  = rawDrill * DRILL_TO_AMP;
-  float currPower  = rawPower * POWER_TO_AMP;
-  float currLinear = rawLinear * LINEAR_TO_AMP;
-
-  // Send binary data without newline
-  Serial.write((uint8_t*)&currDrill, sizeof(float));
-  Serial.write((uint8_t*)&currPower, sizeof(float));
-  Serial.write((uint8_t*)&currLinear, sizeof(float));
+  send_scaled(DRILL_CURRENT_PIN,  SCALE_DRILL);
+  send_scaled(POWER_CURRENT_PIN,  SCALE_POWER);
+  send_scaled(LINEAR_CURRENT_PIN, SCALE_LINEAR);
 }
