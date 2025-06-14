@@ -1224,7 +1224,7 @@ static inline void analogReadResolution(unsigned int bits) { analogReadRes(bits)
 constexpr uint8_t OFF_SYNC     = OFF_LINEAR + sizeof(int16_t);
 
 void setup() {
-  Serial.begin(2000000);
+  Serial.begin(6000000);
   analogReadResolution(12);
   analogReadAveraging(0);
       9c:	2000      	movs	r0, #0
