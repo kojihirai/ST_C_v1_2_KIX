@@ -3,6 +3,7 @@ import time
 from collections import deque
 import statistics
 import os
+import struct
 
 # Set process priority to maximum
 os.nice(-20)  # Requires sudo privileges
@@ -10,6 +11,7 @@ os.nice(-20)  # Requires sudo privileges
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 2000000
 WINDOW_SIZE = 100
+MESSAGE_SIZE = 13  # 3 floats (4 bytes each) + 1 newline
 
 def main():
     try:
@@ -33,18 +35,21 @@ def main():
         print("Press Ctrl+C to stop and see results")
         
         while True:
-            if ser.in_waiting:
-                # Read all available data at once
-                data = ser.read(ser.in_waiting)
-                lines = data.split(b'\n')
-                
-                for line in lines:
-                    if line:  # Skip empty lines
+            if ser.in_waiting >= MESSAGE_SIZE:
+                # Read complete messages
+                num_messages = ser.in_waiting // MESSAGE_SIZE
+                for _ in range(num_messages):
+                    data = ser.read(MESSAGE_SIZE - 1)  # Read everything except newline
+                    newline = ser.read(1)  # Read newline
+                    
+                    if newline == b'\n':  # Verify message is complete
+                        # Unpack 3 float values
+                        drill, power, linear = struct.unpack('fff', data)
                         current_time = time.time()
                         timestamps.append(current_time)
                         sample_count += 1
                 
-                # Update display every 0.1 seconds instead of every 100 samples
+                # Update display every 0.1 seconds
                 current_time = time.time()
                 if current_time - last_print_time >= 0.1:
                     if len(timestamps) > 1:
