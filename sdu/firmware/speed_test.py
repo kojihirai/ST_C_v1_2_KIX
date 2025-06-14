@@ -12,11 +12,12 @@ except PermissionError:
     pass  # Not fatal if not run with sudo
 
 SERIAL_PORT = "/dev/ttyACM0"
-BAUD_RATE = 6000000
+BAUD_RATE = 2000000  # Updated to match teensy.ino
 WINDOW_SIZE = 100
-MESSAGE_SIZE = 6  # 3 x int16 = 6 bytes
+PACKET_SIZE = 7  # 3 x int16 + 1 sync byte = 7 bytes
 BATCH_SIZE = 100
 AMP_SCALE = 100.0  # Integer was scaled by 100 (0.01A resolution)
+SYNC_BYTE = b'\n'  # Match the sync byte from teensy.ino
 
 def main():
     try:
@@ -39,15 +40,15 @@ def main():
         print("Press Ctrl+C to stop and see results")
         
         while True:
-            if ser.in_waiting >= MESSAGE_SIZE * BATCH_SIZE:
-                data = ser.read(MESSAGE_SIZE * BATCH_SIZE)
+            if ser.in_waiting >= PACKET_SIZE * BATCH_SIZE:
+                data = ser.read(PACKET_SIZE * BATCH_SIZE)
                 current_time = time.time()
                 
-                for i in range(0, len(data), MESSAGE_SIZE):
-                    message = data[i:i+MESSAGE_SIZE]
-                    if len(message) == MESSAGE_SIZE:
-                        # Unpack as 3 signed int16s
-                        raw_drill, raw_power, raw_linear = struct.unpack('<hhh', message)
+                for i in range(0, len(data), PACKET_SIZE):
+                    message = data[i:i+PACKET_SIZE]
+                    if len(message) == PACKET_SIZE and message[-1] == ord(SYNC_BYTE):
+                        # Unpack as 3 signed int16s, ignoring the sync byte
+                        raw_drill, raw_power, raw_linear = struct.unpack('<hhh', message[:-1])
                         drill = raw_drill / AMP_SCALE
                         power = raw_power / AMP_SCALE
                         linear = raw_linear / AMP_SCALE
