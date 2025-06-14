@@ -9,7 +9,7 @@ import struct
 os.nice(-20)  # Requires sudo privileges
 
 SERIAL_PORT = "/dev/ttyACM0"
-BAUD_RATE = 2000000  # Match Teensy's baud rate
+BAUD_RATE = 2000000
 WINDOW_SIZE = 100
 MESSAGE_SIZE = 13  # 3 floats (4 bytes each) + 1 newline
 
@@ -77,4 +77,4 @@ def main():
             ser.close()
 
 if __name__ == "__main__":
-    main() 
+    main()
