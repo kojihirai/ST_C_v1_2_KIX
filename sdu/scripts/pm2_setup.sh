@@ -42,11 +42,12 @@ module.exports = {
     {
       name: 'firmware-service',
       script: 'firmware/firmware.py',
-      interpreter: 'sudo ${VENV_PATH}',
+      interpreter: '${VENV_PATH}',
       watch: false,
       autorestart: true,
       max_restarts: 10,
       restart_delay: 5000,
+      exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
         PYTHONUNBUFFERED: '1',
@@ -70,6 +71,10 @@ mkdir -p logs
 
 echo "Starting applications with PM2..."
 pm2 start ecosystem.config.js
+
+# Start firmware service with sudo
+echo "Starting firmware service with sudo..."
+pm2 restart firmware-service --interpreter "sudo ${VENV_PATH}"
 
 pm2 save
 
