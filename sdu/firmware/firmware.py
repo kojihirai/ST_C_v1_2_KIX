@@ -1,34 +1,15 @@
 import time
 import json
 import threading
-
-import board
-import busio
-import adafruit_ads1x15.ads1115 as ADS
-from adafruit_ads1x15.analog_in import AnalogIn
+import serial
 
 import paho.mqtt.client as mqtt
 
 # === Config ===
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
-
-# ADS1115 channel → sensor mapping
-ADC_CHANNELS = {
-    "DRILL": ADS.P3,
-    "POWER": ADS.P1,
-    "LINEAR": ADS.P2
-}
-
-# Sensor conversion factors (V per A)
-# Drill motor: 20 mV/A → 0.02 V/A
-# Power In:     100 mV/A → 0.1 V/A
-# Linear:       187.5 mV/A → 0.1875 V/A
-CONVERSION = {
-    "DRILL": 0.1,
-    "POWER": 0.1,
-    "LINEAR": 0.1875
-}
+SERIAL_PORT = "/dev/ttyACM0"
+BAUD_RATE = 115200
 
 class SensorController:
     def __init__(self):
@@ -44,30 +25,27 @@ class SensorController:
         self.experiment_id = 0
         self.run_id = 0
 
-        # --- ADS1115 setup ---
-        i2c = busio.I2C(board.SCL, board.SDA)
-        self.ads = ADS.ADS1115(i2c)
-        # Optional: pick a gain if you need better range/precision
-        # self.ads.gain = 1
-
-        # Create one AnalogIn per sensor
-        self.channels = {
-            name: AnalogIn(self.ads, pin)
-            for name, pin in ADC_CHANNELS.items()
-        }
+        # --- Serial setup ---
+        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+        time.sleep(2)  # Wait for serial connection to stabilize
 
         # Start background loops
         self.running = True
         threading.Thread(target=self.publish_status, daemon=True).start()
 
     def read_sensors(self):
-        measurements = {}
         try:
-            for name, chan in self.channels.items():
-                voltage = chan.voltage  # in volts
-                current = voltage / CONVERSION[name]
-                measurements[name] = current
-            return measurements
+            if self.ser.in_waiting:
+                line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+                if line:
+                    # Parse comma-separated values
+                    drill, power, linear = map(float, line.split(','))
+                    return {
+                        "DRILL": drill,
+                        "POWER": power,
+                        "LINEAR": linear
+                    }
+            return None
         except Exception as e:
             print(f"Sensor read error: {e}")
             return None
@@ -106,6 +84,8 @@ class SensorController:
     def stop(self):
         self.running = False
         self.client.loop_stop()
+        if self.ser.is_open:
+            self.ser.close()
         print("SDU stopped.")
 
 if __name__ == "__main__":
