@@ -10,7 +10,6 @@ os.nice(-20)  # Requires sudo privileges
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 115200
 WINDOW_SIZE = 100
-BUFFER_SIZE = 1024  # Increased buffer size
 
 def main():
     try:
@@ -23,9 +22,6 @@ def main():
             inter_byte_timeout=None,
             exclusive=True  # Exclusive access to port
         )
-        
-        # Set buffer sizes
-        ser.set_buffer_size(rx_size=BUFFER_SIZE, tx_size=BUFFER_SIZE)
         
         # Use deque for efficient rolling window of timestamps
         timestamps = deque(maxlen=WINDOW_SIZE)
