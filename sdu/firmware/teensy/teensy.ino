@@ -24,9 +24,9 @@ void loop() {
   float voltPower  = rawPower  * VREF / ADC_MAX;
   float voltLinear = rawLinear * VREF / ADC_MAX;
 
-  float currDrill  = (voltDrill  * 1000.0f) / SENS_DRILL;
-  float currPower  = (voltPower  * 1000.0f) / SENS_POWER;
-  float currLinear = (voltLinear * 1000.0f) / SENS_LINEAR;
+  float currDrill  = (voltDrill) / SENS_DRILL;
+  float currPower  = (voltPower) / SENS_POWER;
+  float currLinear = (voltLinear) / SENS_LINEAR;
 
   Serial.print(currDrill,  2);
   Serial.print(',');
