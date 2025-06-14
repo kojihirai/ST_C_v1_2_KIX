@@ -90,7 +90,7 @@ class SensorController:
                     "run_id": self.run_id
                 }
                 self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
-                print("Status:", status)
+                # print("Status:", status)
             time.sleep(0.001)  # Reduced sleep time for higher sampling rate
 
     def send_error(self, msg):
