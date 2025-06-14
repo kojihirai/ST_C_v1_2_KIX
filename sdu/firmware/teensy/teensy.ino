@@ -1,32 +1,27 @@
-#include <string.h>  // for memcpy
-
 const int DRILL_PIN  = A6;
 const int POWER_PIN  = A7;
 const int LINEAR_PIN = A8;
 
-constexpr float VREF         = 3.3f;
 constexpr int   ADC_MAX      = 4095;
-constexpr float SENS_DRILL   = 0.1f;
-constexpr float SENS_POWER   = 0.1f;
-constexpr float SENS_LINEAR  = 0.1875f;
+constexpr float VREF         = 3.3f;
 constexpr float SCALE_FACTOR = 100.0f;
 
-constexpr float MULT_DRILL  = VREF / ADC_MAX / SENS_DRILL  * SCALE_FACTOR;
-constexpr float MULT_POWER  = VREF / ADC_MAX / SENS_POWER  * SCALE_FACTOR;
-constexpr float MULT_LINEAR = VREF / ADC_MAX / SENS_LINEAR * SCALE_FACTOR;
+constexpr int SENS_DRILL_uV  = 100000;
+constexpr int SENS_POWER_uV  = 100000;
+constexpr int SENS_LINEAR_uV = 187500;
 
-constexpr size_t PACKET_SIZE   = 3 * sizeof(int16_t) + 1;
-constexpr uint8_t SYNC_BYTE    = '\n';
-constexpr uint8_t OFF_DRILL    = 0;
-constexpr uint8_t OFF_POWER    = OFF_DRILL  + sizeof(int16_t);
-constexpr uint8_t OFF_LINEAR   = OFF_POWER  + sizeof(int16_t);
-constexpr uint8_t OFF_SYNC     = OFF_LINEAR + sizeof(int16_t);
+constexpr int32_t VREF_uV    = 3300000;
+constexpr int32_t MUL_DRILL  = (VREF_uV * SCALE_FACTOR) / (ADC_MAX * SENS_DRILL_uV);
+constexpr int32_t MUL_POWER  = (VREF_uV * SCALE_FACTOR) / (ADC_MAX * SENS_POWER_uV);
+constexpr int32_t MUL_LINEAR = (VREF_uV * SCALE_FACTOR) / (ADC_MAX * SENS_LINEAR_uV);
+
+constexpr uint8_t SYNC_BYTE = '\n';
 
 void setup() {
-  Serial.begin(6000000);
   analogReadResolution(12);
   analogReadAveraging(0);
-  while (!Serial); 
+  Serial.begin(6000000);
+  while (!Serial);
 }
 
 void loop() {
@@ -34,15 +29,12 @@ void loop() {
   uint16_t rawPower  = analogRead(POWER_PIN);
   uint16_t rawLinear = analogRead(LINEAR_PIN);
 
-  int16_t sDrill  = int16_t(rawDrill  * MULT_DRILL);
-  int16_t sPower  = int16_t(rawPower  * MULT_POWER);
-  int16_t sLinear = int16_t(rawLinear * MULT_LINEAR);
+  int16_t sDrill  = int16_t(rawDrill  * MUL_DRILL);
+  int16_t sPower  = int16_t(rawPower  * MUL_POWER);
+  int16_t sLinear = int16_t(rawLinear * MUL_LINEAR);
 
-  uint8_t buf[PACKET_SIZE];
-  memcpy(buf + OFF_DRILL,  &sDrill,  sizeof(sDrill));
-  memcpy(buf + OFF_POWER,  &sPower,  sizeof(sPower));
-  memcpy(buf + OFF_LINEAR, &sLinear, sizeof(sLinear));
-  buf[OFF_SYNC] = SYNC_BYTE;
-  Serial.write(buf, PACKET_SIZE);
-
+  Serial.write((uint8_t*)&sDrill, sizeof(sDrill));
+  Serial.write((uint8_t*)&sPower, sizeof(sPower));
+  Serial.write((uint8_t*)&sLinear, sizeof(sLinear));
+  Serial.write(SYNC_BYTE);
 }

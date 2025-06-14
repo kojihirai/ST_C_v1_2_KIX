@@ -4,6 +4,7 @@ from collections import deque
 import statistics
 import os
 import struct
+import numpy as np
 
 # Set process priority to maximum (optional, needs sudo)
 try:
@@ -13,9 +14,9 @@ except PermissionError:
 
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 6000000  # Updated to match teensy.ino
-WINDOW_SIZE = 100
+WINDOW_SIZE = 1000  # Increased for better statistics
 PACKET_SIZE = 7  # 3 x int16 + 1 sync byte = 7 bytes
-BATCH_SIZE = 100
+BATCH_SIZE = 1000  # Increased for better throughput
 AMP_SCALE = 100.0  # Integer was scaled by 100 (0.01A resolution)
 SYNC_BYTE = b'\n'  # Match the sync byte from teensy.ino
 
@@ -31,10 +32,13 @@ def main():
         )
         
         timestamps = deque(maxlen=WINDOW_SIZE)
+        values = deque(maxlen=WINDOW_SIZE)
         start_time = time.time()
         sample_count = 0
         last_print_time = start_time
         last_values = None
+        min_interval = float('inf')
+        max_interval = 0
 
         print("Starting speed test...")
         print("Press Ctrl+C to stop and see results")
@@ -44,6 +48,7 @@ def main():
                 data = ser.read(PACKET_SIZE * BATCH_SIZE)
                 current_time = time.time()
                 
+                # Process all packets in the batch
                 for i in range(0, len(data), PACKET_SIZE):
                     message = data[i:i+PACKET_SIZE]
                     if len(message) == PACKET_SIZE and message[-1] == ord(SYNC_BYTE):
@@ -54,16 +59,28 @@ def main():
                         linear = raw_linear / AMP_SCALE
 
                         timestamps.append(current_time)
+                        values.append((drill, power, linear))
                         sample_count += 1
                         last_values = (drill, power, linear)
                 
                 if current_time - last_print_time >= 0.1:
                     if len(timestamps) > 1:
-                        intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
-                        avg_interval = statistics.mean(intervals)
+                        intervals = np.diff(list(timestamps))
+                        avg_interval = np.mean(intervals)
+                        std_interval = np.std(intervals)
+                        min_interval = min(min_interval, np.min(intervals))
+                        max_interval = max(max_interval, np.max(intervals))
                         current_sps = 1.0 / avg_interval if avg_interval > 0 else 0
+                        
                         if last_values:
-                            print(f"\rCurrent SPS: {current_sps:.1f} | Drill: {last_values[0]:.2f}A Power: {last_values[1]:.2f}A Linear: {last_values[2]:.2f}A", end="", flush=True)
+                            print(f"\rSPS: {current_sps:.1f} | "
+                                  f"Jitter: {std_interval*1000:.1f}ms | "
+                                  f"Min: {min_interval*1000:.1f}ms | "
+                                  f"Max: {max_interval*1000:.1f}ms | "
+                                  f"Drill: {last_values[0]:.2f}A | "
+                                  f"Power: {last_values[1]:.2f}A | "
+                                  f"Linear: {last_values[2]:.2f}A", 
+                                  end="", flush=True)
                     last_print_time = current_time
 
             time.sleep(0.000001)  # Minimized delay for max responsiveness
@@ -78,6 +95,12 @@ def main():
             print(f"Total samples: {sample_count}")
             print(f"Duration: {duration:.1f} seconds")
             print(f"Average SPS: {total_sps:.1f}")
+            print(f"Min interval: {min_interval*1000:.1f}ms")
+            print(f"Max interval: {max_interval*1000:.1f}ms")
+            if len(timestamps) > 1:
+                intervals = np.diff(list(timestamps))
+                print(f"Average interval: {np.mean(intervals)*1000:.1f}ms")
+                print(f"Interval std dev: {np.std(intervals)*1000:.1f}ms")
             if last_values:
                 print(f"Last values - Drill: {last_values[0]:.2f}A Power: {last_values[1]:.2f}A Linear: {last_values[2]:.2f}A")
     finally:
