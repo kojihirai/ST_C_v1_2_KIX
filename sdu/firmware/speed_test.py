@@ -31,6 +31,7 @@ def main():
         start_time = time.time()
         sample_count = 0
         last_print_time = start_time
+        last_values = None
         
         print("Starting speed test...")
         print("Press Ctrl+C to stop and see results")
@@ -49,6 +50,7 @@ def main():
                         drill, power, linear = struct.unpack('fff', message)
                         timestamps.append(current_time)
                         sample_count += 1
+                        last_values = (drill, power, linear)
                 
                 # Update display every 0.1 seconds
                 if current_time - last_print_time >= 0.1:
@@ -56,7 +58,8 @@ def main():
                         intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
                         avg_interval = statistics.mean(intervals)
                         current_sps = 1.0 / avg_interval if avg_interval > 0 else 0
-                        print(f"\rCurrent SPS: {current_sps:.1f}", end="", flush=True)
+                        if last_values:
+                            print(f"\rCurrent SPS: {current_sps:.1f} | Drill: {last_values[0]:.2f}A Power: {last_values[1]:.2f}A Linear: {last_values[2]:.2f}A", end="", flush=True)
                     last_print_time = current_time
             
             # Reduced sleep time for more frequent checks
@@ -72,6 +75,8 @@ def main():
             print(f"Total samples: {sample_count}")
             print(f"Duration: {duration:.1f} seconds")
             print(f"Average SPS: {total_sps:.1f}")
+            if last_values:
+                print(f"Last values - Drill: {last_values[0]:.2f}A Power: {last_values[1]:.2f}A Linear: {last_values[2]:.2f}A")
     finally:
         if 'ser' in locals() and ser.is_open:
             ser.close()
