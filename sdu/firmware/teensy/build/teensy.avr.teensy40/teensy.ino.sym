@@ -6,11 +6,11 @@ SYMBOL TABLE:
 60001400 l    d  .text.code	00000000 .text.code
 60001af4 l    d  .text.progmem	00000000 .text.progmem
 00000000 l    d  .text.itcm	00000000 .text.itcm
-00001bb0 l    d  .fini	00000000 .fini
+00001be0 l    d  .fini	00000000 .fini
 20000000 l    d  .data	00000000 .data
 20000ac0 l    d  .bss	00000000 .bss
 20200000 l    d  .bss.dma	00000000 .bss.dma
-60004270 l    d  .text.csf	00000000 .text.csf
+600042a0 l    d  .text.csf	00000000 .text.csf
 00000000 l    d  .debug_info	00000000 .debug_info
 00000000 l    d  .debug_abbrev	00000000 .debug_abbrev
 00000000 l    d  .debug_line	00000000 .debug_line
@@ -35,9 +35,9 @@ SYMBOL TABLE:
 20000d1c l     O .bss	00000004 s_hot_ROOM
 20000d20 l     O .bss	00000004 s_roomC_hotC
 00000000 l    df *ABS*	00000000 usb.c
-00000574 l     F .text.itcm	00000088 schedule_transfer
-000005fc l     F .text.itcm	00000036 run_callbacks
-00000634 l     F .text.itcm	00000098 endpoint0_transmit.constprop.0
+00000580 l     F .text.itcm	00000088 schedule_transfer
+00000608 l     F .text.itcm	00000036 run_callbacks
+00000640 l     F .text.itcm	00000098 endpoint0_transmit.constprop.0
 20000cb4 l     O .bss	00000008 endpoint0_buffer
 20000cbc l     O .bss	00000004 endpoint0_notify_mask
 20000c80 l     O .bss	00000008 endpoint0_setupdata
@@ -61,12 +61,12 @@ SYMBOL TABLE:
 00000000 l    df *ABS*	00000000 delay.c
 00000000 l    df *ABS*	00000000 main.cpp
 00000000 l    df *ABS*	00000000 usb_serial.c
-00000ec0 l     F .text.itcm	00000060 rx_queue_transfer
+00000ecc l     F .text.itcm	00000060 rx_queue_transfer
 20200080 l     O .bss.dma	00001000 rx_buffer
-00000f20 l     F .text.itcm	000000b4 rx_event
-00000fd4 l     F .text.itcm	00000090 usb_serial_flush_callback
+00000f2c l     F .text.itcm	000000b4 rx_event
+00000fe0 l     F .text.itcm	00000090 usb_serial_flush_callback
 20201080 l     O .bss.dma	00002000 txbuffer
-00001064 l     F .text.itcm	000001b8 usb_serial_write.part.0
+00001070 l     F .text.itcm	000001b8 usb_serial_write.part.0
 20000ce4 l     O .bss	00000004 rx_available
 20000ce8 l     O .bss	00000010 rx_count
 20000d52 l     O .bss	00000001 rx_head
@@ -100,34 +100,34 @@ SYMBOL TABLE:
 60001ad8 l     F .text.code	00000008 __memset_veneer
 60001ae0 l     F .text.code	00000008 ____libc_init_array_veneer
 60001ae8 l     F .text.code	00000008 __set_arm_clock_veneer
-00001b98 l     F .text.itcm	00000008 ___reboot_Teensyduino__veneer
-00001ba0 l     F .text.itcm	00000008 ___init_veneer
-00001320 g     F .text.itcm	00000018 usb_serial_available
+00001bd0 l     F .text.itcm	00000008 ___reboot_Teensyduino__veneer
+00001bd8 l     F .text.itcm	00000008 ___init_veneer
+0000132c g     F .text.itcm	00000018 usb_serial_available
 600016cc g     F .text.code	00000002 startup_default_late_hook
-00001350  w    F .text.itcm	000000d8 yield
+00001388  w    F .text.itcm	000000d8 yield
 20000d44 g     O .bss	00000004 usb_timer1_callback
 60001b0c g     O .text.progmem	00000018 usb_string_manufacturer_name_default
-00000244 g     F .text.itcm	00000088 analogReadAveraging
+00000250 g     F .text.itcm	00000088 analogReadAveraging
 20000d4f g     O .bss	00000001 HardwareSerialIMXRT::s_count_serials_with_serial_events
 60001670 g     F .text.code	00000054 analog_init
 200005a4 g     O .data	00000004 F_CPU_ACTUAL
-00001bb4 g       .data	00000000 __exidx_end
+00001be4 g       .data	00000000 __exidx_end
 20000d4e g     O .bss	00000001 EventResponder::runningFromYield
-00000514 g     F .text.itcm	00000060 tempmonGetTemp
+00000520 g     F .text.itcm	00000060 tempmonGetTemp
 60001000 g     O .text.headers	00000020 ImageVectorTable
 20000c90 g     O .bss	00000004 EventResponder::firstInterrupt
-00000e64 g     F .text.itcm	00000004 usb_transfer_status
+00000e70 g     F .text.itcm	00000004 usb_transfer_status
 20000c98 g     O .bss	0000001c HardwareSerialIMXRT::s_serials_with_serial_events
 20000280 g     O .data	00000280 digital_pin_to_info_PGM
-00001bb0 g       .text.itcm	00000000 _etext
+00001be0 g       .text.itcm	00000000 _etext
 20000ac0 g       .bss	00000000 _sbss
 60001bfc g       *ABS*	00000000 _stextload
-000000ec g     F .text.itcm	00000046 loop
-00001918 g     F .text.itcm	0000007a flexpwm_init
+000000ec g     F .text.itcm	00000052 loop
+00001950 g     F .text.itcm	0000007a flexpwm_init
 600016d0 g     F .text.code	00000004 startup_debug_reset
-00000d28 g     F .text.itcm	00000064 usb_config_rx
+00000d34 g     F .text.itcm	00000064 usb_config_rx
 20000c8c g     O .bss	00000004 EventResponder::lastInterrupt
-00001780 g     F .text.itcm	00000134 memcpy
+000017b8 g     F .text.itcm	00000134 memcpy
 20000ac0 g     O .data	00000000 .hidden __TMC_END__
 20000d2c g     O .bss	00000004 systick_millis_count
 20000d59 g     O .bss	00000001 usb_configuration
@@ -144,67 +144,68 @@ aaaaaaab g       *ABS*	00000000 _flexram_bank_config
 20000c94 g     O .bss	00000004 EventResponder::lastYield
 60004400 g     O .text.csf	00000c00 hab_csf
 20280000 g       .text.csf	00000000 _heap_end
-00001bb4 g       .data	00000000 __exidx_start
+00001be4 g       .data	00000000 __exidx_start
 20000c88 g     O .bss	00000004 EventResponder::firstYield
-00001b50 g     F .text.itcm	00000048 __libc_init_array
-600037b0 g       *ABS*	00000000 _sdataload
+00001b88 g     F .text.itcm	00000048 __libc_init_array
+600037e0 g       *ABS*	00000000 _sdataload
 20000d58 g     O .bss	00000001 usb_cdc_line_rtsdtr
 60001aac g     F .text.code	00000000 _init
-0000121c g     F .text.itcm	00000002 usb_serial_reset
+00001228 g     F .text.itcm	00000002 usb_serial_reset
 60001b28 g     O .text.progmem	00000062 usb_config_descriptor_12
 20000d80 g       .bss	00000000 _ebss
 20203080 g       .bss.dma	00000000 _heap_start
 00000001 g       *ABS*	00000000 _itcm_block_count
 20000ae0 g     O .bss	00000020 endpoint0_transfer_data
-00001994 g     F .text.itcm	000000f4 pwm_init
+000019cc g     F .text.itcm	000000f4 pwm_init
 60005000 g       .text.csf	00000000 __text_csf_end
 600017e4 g     F .text.code	0000005c usb_pll_start
 20000ac0 g     O .bss	00000020 endpoint0_transfer_ack
 20000d3c g     O .bss	00000004 usb_cdc_line_rtsdtr_millis
-00000e20 g     F .text.itcm	00000028 usb_transmit
-00001470 g     F .text.itcm	00000020 systick_isr
+00000e2c g     F .text.itcm	00000028 usb_transmit
+000014a8 g     F .text.itcm	00000020 systick_isr
 600016c4  w    F .text.code	00000002 startup_early_hook
-00001490 g     F .text.itcm	000002f0 set_arm_clock
+000014c8 g     F .text.itcm	000002f0 set_arm_clock
 20000d28 g     O .bss	00000004 systick_cycle_count
 200005f8 g     O .data	00000016 usb_string_serial_number_default
-00000df0 g     F .text.itcm	00000030 usb_prepare_transfer
-00000384 g     F .text.itcm	0000018c unused_interrupt_vector
+00000dfc g     F .text.itcm	00000030 usb_prepare_transfer
+00000390 g     F .text.itcm	0000018c unused_interrupt_vector
 20000d40 g     O .bss	00000004 usb_timer0_callback
 60001840 g     F .text.code	00000130 tempmon_init
+00001344 g     F .text.itcm	0000002c usb_serial_putchar
 00000024 g       *ABS*	00000000 _teensy_model_identifier
-000001e4 g     F .text.itcm	00000060 analogReadRes
+000001f0 g     F .text.itcm	00000060 analogReadRes
 60001a58 g     F .text.code	00000054 _reboot_Teensyduino_
 600016c8 g     F .text.code	00000002 startup_default_middle_hook
-000006f8 g     F .text.itcm	00000630 usb_isr
+00000704 g     F .text.itcm	00000630 usb_isr
 20000d24 g     O .bss	00000004 scale_cpu_cycles_to_microseconds
 20000800 g     O .data	000002c0 _VectorsRam
 20000d5c g     O .bss	00000001 yield_active_check_flags
 20000d5a g     O .bss	00000001 usb_high_speed
-00001aac g     F .text.itcm	000000a4 memset
-00000374 g     F .text.itcm	00000010 main
+00001ae4 g     F .text.itcm	000000a4 memset
+00000380 g     F .text.itcm	00000010 main
 20200000 g     O .bss.dma	00000062 usb_descriptor_buffer
-00000e68 g     F .text.itcm	00000058 usb_init_serialnumber
+00000e74 g     F .text.itcm	00000058 usb_init_serialnumber
 60001af4 g       .text.code	00000000 __init_array_end
 60001b24 g     O .text.progmem	00000004 string0
-00001338 g     F .text.itcm	00000018 usb_serial_write
+00001370 g     F .text.itcm	00000018 usb_serial_write
 600016cc  w    F .text.code	00000002 startup_late_hook
 20000000 g     O .data	00000280 endpoint_queue_head
 60001af4  w    O .text.progmem	00000016 usb_string_product_name
-000002cc g     F .text.itcm	000000a8 delay
-00001bb0 g     F .fini	00000000 _fini
+000002d8 g     F .text.itcm	000000a8 delay
+00001be0 g     F .fini	00000000 _fini
 60001020 g     O .text.headers	0000000c BootData
-00000510 g     F .text.itcm	00000004 Panic_Temp_isr
+0000051c g     F .text.itcm	00000004 Panic_Temp_isr
 60001af0 g       .text.code	00000000 __preinit_array_end
-000006cc g     F .text.itcm	0000002c usb_stop_sof_interrupts
+000006d8 g     F .text.itcm	0000002c usb_stop_sof_interrupts
 00000068 g     F .text.itcm	00000084 setup
 2000051c g     O .data	00000084 usb_descriptor_list
 20078000 g       .text.csf	00000000 _estack
-00001220 g     F .text.itcm	00000100 usb_serial_configure
+0000122c g     F .text.itcm	00000100 usb_serial_configure
 20000ac0 g       .data	00000000 _edata
-000018b4 g     F .text.itcm	00000062 ultoa
-00001428 g     F .text.itcm	00000044 EventResponder::runFromInterrupt()
+000018ec g     F .text.itcm	00000062 ultoa
+00001460 g     F .text.itcm	00000044 EventResponder::runFromInterrupt()
 60001af0 g       .text.code	00000000 __init_array_start
-00000134 g     F .text.itcm	000000b0 analogRead
+00000140 g     F .text.itcm	000000b0 analogRead
 200005a0 g     O .data	00000004 F_BUS_ACTUAL
 20000500 g     O .data	0000001c pin_to_channel
 00000000 g       .text.itcm	00000000 _stext
@@ -212,11 +213,11 @@ aaaaaaab g       *ABS*	00000000 _flexram_bank_config
 600016c8  w    F .text.code	00000002 startup_middle_hook
 600016d4 g     F .text.code	00000110 configure_cache
 60001af0 g       .text.code	00000000 __preinit_array_start
-00000e48 g     F .text.itcm	0000001c usb_receive
+00000e54 g     F .text.itcm	0000001c usb_receive
 00005000 g       *ABS*	00000000 _flashimagelen
-00001a88 g     F .text.itcm	00000024 rtc_get
-0000146c g     F .text.itcm	00000004 pendablesrvreq_isr
-00000d8c g     F .text.itcm	00000064 usb_config_tx
+00001ac0 g     F .text.itcm	00000024 rtc_get
+000014a4 g     F .text.itcm	00000004 pendablesrvreq_isr
+00000d98 g     F .text.itcm	00000064 usb_config_tx
 200005f8  w    O .data	00000016 usb_string_serial_number
 
 

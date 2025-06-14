@@ -1,39 +1,47 @@
-const int DRILL_CURRENT_PIN  = A6;
-const int POWER_CURRENT_PIN  = A7;
-const int LINEAR_CURRENT_PIN = A8;
+constexpr uint32_t BAUD = 6'000'000;
+constexpr uint8_t  SYNC = 0xA5;
+constexpr bool     USE_CHECKSUM = true;
 
-// ADC config
-const int   VREF_uV   = 3300000;
-const int   ADC_MAX   = 4095;
-const float AMP_SCALE = 100.0f;
+constexpr uint8_t DRILL_PIN  = A6;
+constexpr uint8_t POWER_PIN  = A7;
+constexpr uint8_t LINEAR_PIN = A8;
 
-// Sensor conversion factors (in uV per A)
-const int SENS_DRILL_uV  = 100000;
-const int SENS_POWER_uV  = 100000;
-const int SENS_LINEAR_uV = 187500;
+struct __attribute__((packed)) Sample {
+  uint16_t drill;
+  uint16_t power;
+  uint16_t linear;
+};
 
-// Precomputed scaling factors
-const int32_t SCALE_DRILL  = (int32_t)VREF_uV * AMP_SCALE / (ADC_MAX * SENS_DRILL_uV);
-const int32_t SCALE_POWER  = (int32_t)VREF_uV * AMP_SCALE / (ADC_MAX * SENS_POWER_uV);
-const int32_t SCALE_LINEAR = (int32_t)VREF_uV * AMP_SCALE / (ADC_MAX * SENS_LINEAR_uV);
+static inline void sendSample(const Sample& s)
+{
+  if constexpr (USE_CHECKSUM) {
+    uint8_t chk = 0;
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(&s);
+    for (size_t i = 0; i < sizeof(Sample); ++i) chk ^= p[i];
 
-void setup() {
-  analogReadResolution(12);
-  analogReadAveraging(0);
-  Serial.begin(6000000);
-  while (!Serial);
+    Serial.write(SYNC);
+    Serial.write(p, sizeof(Sample));
+    Serial.write(chk);
+  } else {
+    Serial.write(reinterpret_cast<const uint8_t*>(&s), sizeof(Sample));
+  }
 }
 
-void loop() {
-  uint16_t raw_drill  = analogRead(DRILL_CURRENT_PIN);
-  uint16_t raw_power  = analogRead(POWER_CURRENT_PIN);
-  uint16_t raw_linear = analogRead(LINEAR_CURRENT_PIN);
+void setup()
+{
+  Serial.begin(BAUD);
+  while (!Serial) ;
 
-  int16_t drill_amp  = raw_drill  * SCALE_DRILL;
-  int16_t power_amp  = raw_power  * SCALE_POWER;
-  int16_t linear_amp = raw_linear * SCALE_LINEAR;
+  analogReadResolution(12);
+  analogReadAveraging(0);
+}
 
-  Serial.write((uint8_t*)&drill_amp, sizeof(int16_t));
-  Serial.write((uint8_t*)&power_amp, sizeof(int16_t));
-  Serial.write((uint8_t*)&linear_amp, sizeof(int16_t));
+void loop()
+{
+  Sample s;
+  s.drill  = analogRead(DRILL_PIN);
+  s.power  = analogRead(POWER_PIN);
+  s.linear = analogRead(LINEAR_PIN);
+
+  sendSample(s);
 }
