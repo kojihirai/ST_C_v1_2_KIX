@@ -12,7 +12,7 @@ except PermissionError:
     pass  # Not fatal if not run with sudo
 
 SERIAL_PORT = "/dev/ttyACM0"
-BAUD_RATE = 2000000  # Updated to match teensy.ino
+BAUD_RATE = 6000000  # Updated to match teensy.ino
 WINDOW_SIZE = 100
 PACKET_SIZE = 7  # 3 x int16 + 1 sync byte = 7 bytes
 BATCH_SIZE = 100

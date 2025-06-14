@@ -23,7 +23,7 @@ constexpr uint8_t OFF_LINEAR   = OFF_POWER  + sizeof(int16_t);
 constexpr uint8_t OFF_SYNC     = OFF_LINEAR + sizeof(int16_t);
 
 void setup() {
-  Serial.begin(2000000);
+  Serial.begin(6000000);
   analogReadResolution(12);
   analogReadAveraging(0);
   while (!Serial); 
