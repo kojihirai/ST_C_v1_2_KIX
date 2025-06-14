@@ -4,7 +4,7 @@ from collections import deque
 import os
 import struct
 
-# Optional: set process to high priority
+# Optional: set high priority
 try:
     os.nice(-20)
 except PermissionError:
@@ -13,9 +13,15 @@ except PermissionError:
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 2000000
 WINDOW_SIZE = 100
-MESSAGE_SIZE = 6  # 3 x int16
-BATCH_SIZE = 100
-AMP_SCALE = 100.0
+FRAME_SIZE = 25              # 1 sync + 4 samples * 6 bytes
+SAMPLES_PER_FRAME = 4
+BATCH_SIZE = 100             # Number of frames to read at once
+
+def find_sync(data):
+    for i in range(len(data) - FRAME_SIZE + 1):
+        if data[i] == 0xAA:
+            return i
+    return -1
 
 def main():
     try:
@@ -32,22 +38,27 @@ def main():
         start_time = time.time()
         sample_count = 0
 
+        print("Reading... Press Ctrl+C to stop")
+
         while True:
-            if ser.in_waiting >= MESSAGE_SIZE * BATCH_SIZE:
-                data = ser.read(MESSAGE_SIZE * BATCH_SIZE)
-                current_time = time.time()
+            if ser.in_waiting >= FRAME_SIZE * BATCH_SIZE:
+                raw = ser.read(FRAME_SIZE * BATCH_SIZE)
+                i = 0
 
-                for i in range(0, len(data), MESSAGE_SIZE):
-                    message = data[i:i+MESSAGE_SIZE]
-                    if len(message) == MESSAGE_SIZE:
-                        raw_drill, raw_power, raw_linear = struct.unpack('<hhh', message)
-                        # Optional conversion (not used here to save time):
-                        # drill = raw_drill / AMP_SCALE
-                        # power = raw_power / AMP_SCALE
-                        # linear = raw_linear / AMP_SCALE
-                        timestamps.append(current_time)
-                        sample_count += 1
-
+                while i <= len(raw) - FRAME_SIZE:
+                    if raw[i] == 0xAA:
+                        payload = raw[i+1:i+25]
+                        if len(payload) == 24:
+                            for j in range(0, 24, 6):
+                                sample = payload[j:j+6]
+                                if len(sample) == 6:
+                                    raw_drill, raw_power, raw_linear = struct.unpack('<hhh', sample)
+                                    # Optionally scale here
+                                    timestamps.append(time.time())
+                                    sample_count += 1
+                        i += FRAME_SIZE
+                    else:
+                        i += 1  # Sync byte not found, resync
     except KeyboardInterrupt:
         duration = time.time() - start_time
         avg_sps = sample_count / duration if duration > 0 else 0
