@@ -14,6 +14,7 @@ echo "Removing PM2 startup configuration..."
 pm2 unstartup
 
 VENV_PATH="$(pwd)/venv/bin/python3"
+VENV_ACTIVATE="$(pwd)/venv/bin/activate"
 
 cat > ecosystem.config.js << EOL
 module.exports = {
@@ -52,7 +53,8 @@ module.exports = {
         NODE_ENV: 'production',
         PYTHONUNBUFFERED: '1',
         PYTHONPATH: '$(pwd)',
-        PATH: '$(pwd)/venv/bin:${PATH}'
+        PATH: '$(pwd)/venv/bin:${PATH}',
+        VIRTUAL_ENV: '$(pwd)/venv'
       },
       error_file: 'logs/firmware-error.log',
       out_file: 'logs/firmware-out.log',
@@ -72,9 +74,9 @@ mkdir -p logs
 echo "Starting applications with PM2..."
 pm2 start ecosystem.config.js
 
-# Start firmware service with sudo
+# Start firmware service with sudo, ensuring it uses the venv Python
 echo "Starting firmware service with sudo..."
-pm2 restart firmware-service --interpreter "sudo ${VENV_PATH}"
+sudo -E env "PATH=$PATH" "VIRTUAL_ENV=$(pwd)/venv" pm2 restart firmware-service --interpreter "sudo -E env 'PATH=$PATH' 'VIRTUAL_ENV=$(pwd)/venv' ${VENV_PATH}"
 
 pm2 save
 
