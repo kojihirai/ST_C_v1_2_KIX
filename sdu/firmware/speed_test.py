@@ -8,7 +8,7 @@ import os
 os.nice(-20)  # Requires sudo privileges
 
 SERIAL_PORT = "/dev/ttyACM0"
-BAUD_RATE = 115200
+BAUD_RATE = 2000000
 WINDOW_SIZE = 100
 
 def main():
