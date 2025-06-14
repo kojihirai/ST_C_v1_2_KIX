@@ -1244,7 +1244,7 @@ void setup() {
 		return usb_configuration && (usb_cdc_line_rtsdtr & USB_SERIAL_DTR) &&
       ba:	2b0e      	cmp	r3, #14
       bc:	d9f1      	bls.n	a2 <setup+0x3a>
-  Serial.begin(2000000);
+  Serial.begin(6000000);
   while (!Serial);
 }
       be:	e8bd 83f8 	ldmia.w	sp!, {r3, r4, r5, r6, r7, r8, r9, pc}
