@@ -29,9 +29,8 @@ void loop() {
   float currPower  = rawPower * POWER_TO_AMP;
   float currLinear = rawLinear * LINEAR_TO_AMP;
 
-  // Send binary data
+  // Send binary data without newline
   Serial.write((uint8_t*)&currDrill, sizeof(float));
   Serial.write((uint8_t*)&currPower, sizeof(float));
   Serial.write((uint8_t*)&currLinear, sizeof(float));
-  Serial.write('\n');  // Keep newline for synchronization
 }

@@ -11,7 +11,8 @@ os.nice(-20)  # Requires sudo privileges
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 2000000
 WINDOW_SIZE = 100
-MESSAGE_SIZE = 13  # 3 floats (4 bytes each) + 1 newline
+MESSAGE_SIZE = 12  # 3 floats (4 bytes each) - removed newline
+BATCH_SIZE = 100  # Process multiple messages at once
 
 def main():
     try:
@@ -35,22 +36,21 @@ def main():
         print("Press Ctrl+C to stop and see results")
         
         while True:
-            if ser.in_waiting >= MESSAGE_SIZE:
-                # Read complete messages
-                num_messages = ser.in_waiting // MESSAGE_SIZE
-                for _ in range(num_messages):
-                    data = ser.read(MESSAGE_SIZE - 1)  # Read everything except newline
-                    newline = ser.read(1)  # Read newline
-                    
-                    if newline == b'\n':  # Verify message is complete
+            if ser.in_waiting >= MESSAGE_SIZE * BATCH_SIZE:
+                # Read multiple messages at once
+                data = ser.read(MESSAGE_SIZE * BATCH_SIZE)
+                current_time = time.time()
+                
+                # Process all messages in the batch
+                for i in range(0, len(data), MESSAGE_SIZE):
+                    message = data[i:i+MESSAGE_SIZE]
+                    if len(message) == MESSAGE_SIZE:
                         # Unpack 3 float values
-                        drill, power, linear = struct.unpack('fff', data)
-                        current_time = time.time()
+                        drill, power, linear = struct.unpack('fff', message)
                         timestamps.append(current_time)
                         sample_count += 1
                 
                 # Update display every 0.1 seconds
-                current_time = time.time()
                 if current_time - last_print_time >= 0.1:
                     if len(timestamps) > 1:
                         intervals = [timestamps[i] - timestamps[i-1] for i in range(1, len(timestamps))]
@@ -60,7 +60,7 @@ def main():
                     last_print_time = current_time
             
             # Reduced sleep time for more frequent checks
-            time.sleep(0.00001)
+            time.sleep(0.000001)  # Reduced sleep time
             
     except serial.SerialException as e:
         print(f"\nSerial error: {e}")
