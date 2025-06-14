@@ -3,7 +3,14 @@ import json
 import threading
 import serial
 import struct
+import os
 import paho.mqtt.client as mqtt
+
+# Set process priority to maximum (optional, needs sudo)
+try:
+    os.nice(-20)
+except PermissionError:
+    pass  # Not fatal if not run with sudo
 
 # === Config ===
 BROKER_IP = "192.168.2.1"

@@ -42,7 +42,7 @@ module.exports = {
     {
       name: 'firmware-service',
       script: 'firmware/firmware.py',
-      interpreter: '${VENV_PATH}',
+      interpreter: 'sudo ${VENV_PATH}',
       watch: false,
       autorestart: true,
       max_restarts: 10,
