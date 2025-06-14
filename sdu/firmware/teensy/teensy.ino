@@ -3,37 +3,38 @@ const int POWER_CURRENT_PIN  = A7;
 const int LINEAR_CURRENT_PIN = A8;
 
 // ADC config
-const float VREF    = 3.3f;
-const int   ADC_MAX = 4095;
-const float ADC_TO_VOLT = VREF / ADC_MAX;
+const int   VREF_uV   = 3300000;  // in microvolts
+const int   ADC_MAX   = 4095;
+const float AMP_SCALE = 100.0f;   // e.g. 3.45 A => 345
 
-// Sensor sensitivities (V/A)
-const float SENS_DRILL  = 0.1f;
-const float SENS_POWER  = 0.1f;
-const float SENS_LINEAR = 0.1875f;
+// Sensor sensitivities (in uV per A)
+const int SENS_DRILL_uV  = 100000;   // 0.1 V/A
+const int SENS_POWER_uV  = 100000;
+const int SENS_LINEAR_uV = 187500;   // 0.1875 V/A
 
-// Output scaling
-const float AMP_SCALE = 100.0f;  // 0.01 A resolution
-
-// === Precomputed int16 scaling factors ===
-const float SCALE_DRILL  = ADC_TO_VOLT / SENS_DRILL  * AMP_SCALE;
-const float SCALE_POWER  = ADC_TO_VOLT / SENS_POWER  * AMP_SCALE;
-const float SCALE_LINEAR = ADC_TO_VOLT / SENS_LINEAR * AMP_SCALE;
+// Precomputed scaling factors (in micro-units)
+const int32_t SCALE_DRILL  = (int32_t)VREF_uV * AMP_SCALE / (ADC_MAX * SENS_DRILL_uV);
+const int32_t SCALE_POWER  = (int32_t)VREF_uV * AMP_SCALE / (ADC_MAX * SENS_POWER_uV);
+const int32_t SCALE_LINEAR = (int32_t)VREF_uV * AMP_SCALE / (ADC_MAX * SENS_LINEAR_uV);
 
 void setup() {
-  Serial.begin(2000000);
   analogReadResolution(12);
   analogReadAveraging(0);
+  Serial.begin(2000000);
   while (!Serial);
 }
 
-inline void send_scaled(int pin, float scale) {
-  int16_t value = analogRead(pin) * scale;
-  Serial.write((uint8_t*)&value, sizeof(int16_t));
-}
-
 void loop() {
-  send_scaled(DRILL_CURRENT_PIN,  SCALE_DRILL);
-  send_scaled(POWER_CURRENT_PIN,  SCALE_POWER);
-  send_scaled(LINEAR_CURRENT_PIN, SCALE_LINEAR);
+  uint16_t raw_drill  = analogRead(DRILL_CURRENT_PIN);
+  uint16_t raw_power  = analogRead(POWER_CURRENT_PIN);
+  uint16_t raw_linear = analogRead(LINEAR_CURRENT_PIN);
+
+  int16_t drill_amp  = raw_drill  * SCALE_DRILL;
+  int16_t power_amp  = raw_power  * SCALE_POWER;
+  int16_t linear_amp = raw_linear * SCALE_LINEAR;
+
+  // Send all three values in one go (6 bytes total)
+  Serial.write((uint8_t*)&drill_amp, sizeof(int16_t));
+  Serial.write((uint8_t*)&power_amp, sizeof(int16_t));
+  Serial.write((uint8_t*)&linear_amp, sizeof(int16_t));
 }
