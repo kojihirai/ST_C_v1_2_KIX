@@ -2,14 +2,17 @@ import time
 import json
 import threading
 import serial
-
+import struct
 import paho.mqtt.client as mqtt
 
 # === Config ===
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
 SERIAL_PORT = "/dev/ttyACM0"
-BAUD_RATE = 115200
+BAUD_RATE = 6000000  # Updated to match teensy.ino
+PACKET_SIZE = 7  # 3 x int16 + 1 sync byte
+SYNC_BYTE = b'\n'
+AMP_SCALE = 100.0  # Integer was scaled by 100 (0.01A resolution)
 
 class SensorController:
     def __init__(self):
@@ -26,7 +29,14 @@ class SensorController:
         self.run_id = 0
 
         # --- Serial setup ---
-        self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+        self.ser = serial.Serial(
+            port=SERIAL_PORT,
+            baudrate=BAUD_RATE,
+            timeout=0,
+            write_timeout=0,
+            inter_byte_timeout=None,
+            exclusive=True
+        )
         time.sleep(2)  # Wait for serial connection to stabilize
 
         # Start background loops
@@ -35,15 +45,15 @@ class SensorController:
 
     def read_sensors(self):
         try:
-            if self.ser.in_waiting:
-                line = self.ser.readline().decode('utf-8', errors='ignore').strip()
-                if line:
-                    # Parse comma-separated values
-                    drill, power, linear = map(float, line.split(','))
+            if self.ser.in_waiting >= PACKET_SIZE:
+                data = self.ser.read(PACKET_SIZE)
+                if len(data) == PACKET_SIZE and data[-1] == ord(SYNC_BYTE):
+                    # Unpack as 3 signed int16s, ignoring the sync byte
+                    raw_drill, raw_power, raw_linear = struct.unpack('<hhh', data[:-1])
                     return {
-                        "DRILL": drill,
-                        "POWER": power,
-                        "LINEAR": linear
+                        "DRILL": raw_drill / AMP_SCALE,
+                        "POWER": raw_power / AMP_SCALE,
+                        "LINEAR": raw_linear / AMP_SCALE
                     }
             return None
         except Exception as e:
@@ -74,7 +84,7 @@ class SensorController:
                 }
                 self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
                 print("Status:", status)
-            time.sleep(0.2)
+            time.sleep(0.001)  # Reduced sleep time for higher sampling rate
 
     def send_error(self, msg):
         err = {"timestamp": time.time(), "error": msg}
