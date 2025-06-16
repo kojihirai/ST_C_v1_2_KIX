@@ -432,7 +432,7 @@ class MotorSystem:
             load_val  = 0.0
             try:
                 load_val = self.load_cell.read_parameter(0x00, length=2, signed=True) or 0.0
-                load_val = (float(load_val)*LOAD_X_OFFSET)+LOAD_Y_OFFSET
+                load_val = ((float(load_val)*LOAD_X_OFFSET)+LOAD_Y_OFFSET)/2
             except Exception:
                 pass
 
