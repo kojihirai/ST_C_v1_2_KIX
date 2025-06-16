@@ -54,10 +54,11 @@ class SensorController:
                 if len(data) == PACKET_SIZE and data[-1] == ord(SYNC_BYTE):
                     # Unpack as 3 signed int16s, ignoring the sync byte
                     raw_drill, raw_power, raw_linear = struct.unpack('<hhh', data[:-1])
+                    # Ensure division is performed with float values
                     return {
-                        "DRILL": raw_drill / AMP_SCALE,
-                        "POWER": raw_power / AMP_SCALE,
-                        "LINEAR": raw_linear / AMP_SCALE
+                        "DRILL": float(raw_drill) / AMP_SCALE,
+                        "POWER": float(raw_power) / AMP_SCALE,
+                        "LINEAR": float(raw_linear) / AMP_SCALE
                     }
         except Exception as e:
             self.send_error(f"Sensor read error: {e}")
@@ -66,32 +67,43 @@ class SensorController:
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
-            self.project_id = data.get("project_id", 0)
-            self.experiment_id = data.get("experiment_id", 0)
-            self.run_id = data.get("run_id", 0)
-        except Exception as e:
+            # Ensure all values are integers
+            self.project_id = int(data.get("project_id", 0))
+            self.experiment_id = int(data.get("experiment_id", 0))
+            self.run_id = int(data.get("run_id", 0))
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
             self.send_error(f"MQTT command error: {e}")
+            # Reset to safe values on error
+            self.project_id = 0
+            self.experiment_id = 0
+            self.run_id = 0
 
     def publish_status(self):
         while self.running:
             meas = self.read_sensors()
             if meas:
-                status = {
-                    "timestamp": time.monotonic(),
-                    "DRILL_CURRENT": meas["DRILL"],
-                    "POWER_CURRENT": meas["POWER"],
-                    "LINEAR_CURRENT": meas["LINEAR"],
-                    "project_id": self.project_id,
-                    "experiment_id": self.experiment_id,
-                    "run_id": self.run_id
-                }
-                self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
+                try:
+                    status = {
+                        "timestamp": time.monotonic(),
+                        "DRILL_CURRENT": float(meas["DRILL"]),
+                        "POWER_CURRENT": float(meas["POWER"]),
+                        "LINEAR_CURRENT": float(meas["LINEAR"]),
+                        "project_id": int(self.project_id),
+                        "experiment_id": int(self.experiment_id),
+                        "run_id": int(self.run_id)
+                    }
+                    self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
+                except (ValueError, TypeError) as e:
+                    self.send_error(f"Status publish error: {e}")
             time.sleep(0.000001)  # Minimized delay for max responsiveness
 
     def send_error(self, msg):
-        err = {"timestamp": time.time(), "error": msg}
-        self.client.publish(f"{DEVICE_ID}/error", json.dumps(err))
-        print("ERROR:", msg)
+        try:
+            err = {"timestamp": time.time(), "error": str(msg)}
+            self.client.publish(f"{DEVICE_ID}/error", json.dumps(err))
+            print("ERROR:", msg)
+        except Exception as e:
+            print(f"Error sending error message: {e}")
 
     def stop(self):
         self.running = False

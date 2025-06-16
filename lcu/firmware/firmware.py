@@ -226,6 +226,8 @@ HOMING_TIMEOUT     = 15.0
 MAX_HOMING_RETRIES = 3
 PID_UPDATE_INTERVAL = 0.001
 
+LOAD_X_OFFSET = 1.5195
+LOAD_Y_OFFSET = -0.5699
 
 # ----------------------------------------------------
 # MotorSystem Class
@@ -430,6 +432,7 @@ class MotorSystem:
             load_val  = 0.0
             try:
                 load_val = self.load_cell.read_parameter(0x00, length=2, signed=True) or 0.0
+                load_val = (load_val*LOAD_X_OFFSET)+LOAD_Y_OFFSET
             except Exception:
                 pass
 
