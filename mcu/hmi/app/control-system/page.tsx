@@ -10,7 +10,6 @@ import { LcuDirection, DcuDirection, LcuCommand, DcuCommand, SystemMode, SystemS
 import { Experiment } from "@/lib/api-client"
 
 export default function ControlSystemPage() {
-  // Mode state
   const [mode, setMode] = useState<SystemMode>('manual')
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [experiments] = useState<Experiment[]>([])
@@ -18,18 +17,14 @@ export default function ControlSystemPage() {
   const [experimentMetadata] = useState<Experiment | null>(null)
   const [systemStatus] = useState<SystemStatus>('stopped')
 
-  // LCU states
   const [lcuDirection, setLcuDirection] = useState<LcuDirection>(LcuDirection.fw)
   const [lcuTarget, setLcuTarget] = useState(0)
 
-  // DCU states
   const [dcuDirection, setDcuDirection] = useState<DcuDirection>(DcuDirection.cw)
   const [dcuTarget, setDcuTarget] = useState(0)
 
-  // Command execution function
   const executeCommand = (unit: "lcu" | "dcu", command: LcuCommand | DcuCommand, params: Record<string, number | string>) => {
     console.log(`Executing ${unit} command:`, command, params)
-    // TODO: Implement actual command execution logic
   }
 
   return (
@@ -49,7 +44,7 @@ export default function ControlSystemPage() {
             <ExperimentSelector
               mode={mode}
               setMode={setMode}
-              projects={[]} // TODO: Fetch projects
+              projects={[]}
               selectedProjectId={selectedProjectId}
               setSelectedProjectId={setSelectedProjectId}
               experiments={experiments}

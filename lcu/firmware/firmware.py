@@ -9,9 +9,7 @@ from queue import Queue
 import paho.mqtt.client as mqtt
 import pigpio
 
-# ----------------------------------------------------
-# Inlined LoadCellDriver (from LoadCell_Driver.py)
-# ----------------------------------------------------
+
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
 
@@ -206,7 +204,6 @@ class Direction(Enum):
     BW = 1
 
 
-# MotorSystem constants
 BROKER_IP           = "192.168.2.1"
 DEVICE_ID           = "lcu"
 MOTOR_PINS          = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
@@ -229,19 +226,14 @@ PID_UPDATE_INTERVAL = 0.001
 LOAD_X_OFFSET = 1.5195
 LOAD_Y_OFFSET = -0.5699
 
-# ----------------------------------------------------
-# MotorSystem Class
-# ----------------------------------------------------
 class MotorSystem:
     def __init__(self):
-        # MQTT setup
         self.client = mqtt.Client()
         self.client.connect(BROKER_IP, 1883, 60)
         self.client.loop_start()
         self.client.subscribe(f"{DEVICE_ID}/cmd")
         self.client.on_message = self.on_message
 
-        # State
         self.mode = Mode.IDLE
         self.direction = Direction.IDLE
         self.target = 0.0
@@ -257,10 +249,8 @@ class MotorSystem:
         self.tick_history = [0] * SPEED_WINDOW
         self.tick_index = 0
 
-        # PID
         self.speed_pid = PIDController(8.0, 1.0, 0.3, 50.0, 0.2)
 
-        # GPIO & Encoder
         self.pi = pigpio.pi()
         for pin in MOTOR_PINS.values():
             self.pi.set_mode(pin, pigpio.OUTPUT)
@@ -275,7 +265,6 @@ class MotorSystem:
         self.pi.callback(ENC_A, pigpio.EITHER_EDGE, self._encoder_callback)
         self.pi.callback(ENC_B, pigpio.EITHER_EDGE, self._encoder_callback)
 
-        # Load cell
         self.load_cell = LoadCellDriver(
             port="/dev/ttyUSB0",
             baudrate=9600,
@@ -291,10 +280,8 @@ class MotorSystem:
         else:
             print("Load cell connection failed")
 
-        # Logger
         self.logger = HighSpeedLogger()
 
-        # Main loops
         self.running = True
         threading.Thread(target=self.run_loop, daemon=True).start()
         threading.Thread(target=self.send_data_loop, daemon=True).start()

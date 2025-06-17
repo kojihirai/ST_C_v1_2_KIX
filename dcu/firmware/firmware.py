@@ -12,14 +12,12 @@ from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
 import time
 
-# === Config ===
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "dcu"
 
 MOTOR1_PINS = {"RPWM": 12, "LPWM": 13, "REN": 23, "LEN": 24}
 
 
-# === Modbus Torque/RPM Sensor ===
 class TorqueDriver:
     def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
         self.client = ModbusSerialClient(
@@ -75,7 +73,6 @@ class TorqueDriver:
             print(f"Modbus read exception at {hex(address)}: {e}")
         return None
 
-# === Mode Definitions ===
 class Mode(Enum):
     IDLE = 0
     RUN_CONTINUOUS = 2

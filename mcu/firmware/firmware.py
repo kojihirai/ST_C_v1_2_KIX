@@ -62,7 +62,6 @@ class RunVideoCreate(BaseModel):
     run_id: int
     video_path: str
 
-# --- FastAPI Setup ---
 
 app = FastAPI()
 
