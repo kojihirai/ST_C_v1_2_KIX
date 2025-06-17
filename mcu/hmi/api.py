@@ -65,6 +65,23 @@ class RunVideoCreate(BaseModel):
     run_id: int
     video_path: str
 
+class ExperimentCommandCreate(BaseModel):
+    experiment_id: int
+    device: str
+    command_data: dict
+    sequence_order: int
+
+class ExperimentCommand(BaseModel):
+    command_id: int
+    experiment_id: int
+    device: str
+    command_data: dict
+    sequence_order: int
+    command_created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # --- FastAPI Setup ---
 
 app = FastAPI()
@@ -331,6 +348,66 @@ def delete_experiment(project_id: int, experiment_id: int):
     cur.execute("DELETE FROM experiments WHERE experiment_id = %s;", (experiment_id,))
     conn.commit()
     return {"message": f"Experiment {experiment_id} deleted."}
+
+# --- Experiment Commands ---
+
+@app.post("/experiments/{experiment_id}/commands")
+def create_experiment_command(experiment_id: int, data: ExperimentCommandCreate):
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("""
+        INSERT INTO experiment_commands (experiment_id, device, command_data, sequence_order)
+        VALUES (%s, %s, %s, %s) RETURNING *;
+    """, (experiment_id, data.device, json.dumps(data.command_data), data.sequence_order))
+    command = cur.fetchone()
+    conn.commit()
+    return command
+
+@app.get("/experiments/{experiment_id}/commands", response_model=List[ExperimentCommand])
+def get_experiment_commands(experiment_id: int):
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("""
+        SELECT * FROM experiment_commands 
+        WHERE experiment_id = %s 
+        ORDER BY sequence_order;
+    """, (experiment_id,))
+    commands = cur.fetchall()
+    return commands
+
+@app.delete("/experiments/{experiment_id}/commands/{command_id}")
+def delete_experiment_command(experiment_id: int, command_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        DELETE FROM experiment_commands 
+        WHERE experiment_id = %s AND command_id = %s;
+    """, (experiment_id, command_id))
+    conn.commit()
+    return {"message": f"Command {command_id} deleted from experiment {experiment_id}"}
+
+@app.post("/experiments/{experiment_id}/commands/execute")
+async def execute_experiment_commands(experiment_id: int):
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("""
+        SELECT * FROM experiment_commands 
+        WHERE experiment_id = %s 
+        ORDER BY sequence_order;
+    """, (experiment_id,))
+    commands = cur.fetchall()
+    
+    for command in commands:
+        command_with_ids = {
+            **command['command_data'],
+            "project_id": current_run_info["project_id"] or 0,
+            "experiment_id": experiment_id,
+            "run_id": current_run_info["run_id"] or 0
+        }
+        # mqtt_client.publish(f"{command['device']}/cmd", json.dumps(command_with_ids))
+        await asyncio.sleep(0.1)  # Small delay between commands
+    
+    return {"success": True, "message": f"Executed {len(commands)} commands for experiment {experiment_id}"}
 
 # --- Runs ---
 

@@ -416,8 +416,15 @@ def create_run(project_id: int, experiment_id: int, data: RunCreate):
         data.start_time,
         data.stop_time
     ))
+    run_id = cur.fetchone()[0]
     conn.commit()
-    return {"run_id": cur.fetchone()[0]}
+    
+    # Update current run info
+    current_run_info["run_id"] = run_id
+    current_run_info["experiment_id"] = experiment_id
+    current_run_info["project_id"] = project_id
+    
+    return {"run_id": run_id}
 
 @app.get("/projects/{project_id}/experiments/{experiment_id}/runs")
 def get_runs(project_id: int, experiment_id: int):

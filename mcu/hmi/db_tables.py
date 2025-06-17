@@ -70,6 +70,19 @@ CREATE TABLE IF NOT EXISTS run_videos (
 );
 """)
 
+# create the experiment_commands table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS experiment_commands (
+    command_id SERIAL PRIMARY KEY,
+    experiment_id INTEGER NOT NULL,
+    device VARCHAR(50) NOT NULL,
+    command_data JSONB NOT NULL,
+    sequence_order INTEGER NOT NULL,
+    command_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE CASCADE
+);
+""")
+
 # Add foreign key constraints
 cursor.execute("""
 ALTER TABLE experiments 
