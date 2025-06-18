@@ -56,7 +56,7 @@ class SensorController:
                     raw_drill, raw_power, raw_linear = struct.unpack('<hhh', data[:-1])
                     # Ensure division is performed with float values
                     return {
-                        "DRILL": (float(raw_drill) / AMP_SCALE ) * 10,
+                        "DRILL": float(raw_drill) / AMP_SCALE,
                         "POWER": float(raw_power) / AMP_SCALE,
                         "LINEAR": float(raw_linear) / AMP_SCALE
                     }

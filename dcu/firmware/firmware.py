@@ -216,8 +216,8 @@ class MotorController:
                 "run_id": self.run_id
             }
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
-            print("Status:", status)
-            print(f"Torque: {self.torque_value}, RPM: {self.rpm_value}")
+            # print("Status:", status)
+            # print(f"Torque: {self.torque_value}, RPM: {self.rpm_value}")
             time.sleep(0.2)
 
     def send_error(self, msg):
