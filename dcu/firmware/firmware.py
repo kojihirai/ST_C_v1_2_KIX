@@ -149,7 +149,7 @@ class MotorController:
             rpm = self.torque_sensor.read_parameter(0x02, 2, signed=True)
             
             if torque is not None:
-                self.torque_value = ((torque / 100.0) * 10)
+                self.torque_value = torque / 10
             if rpm is not None:
                 self.rpm_value = rpm/10
         except Exception as e:
@@ -193,8 +193,6 @@ class MotorController:
 
             elif self.mode == Mode.RUN_CONTINUOUS:
 
-
-                # scale target from 0 to 24 to 0 to 100
                 target = self.target * 100 / 24
                 self.set_motor(target)
             
