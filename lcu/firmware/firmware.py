@@ -424,7 +424,7 @@ class MotorSystem:
                 pass
 
             data = {
-                "timestamp": time.monotonic(),
+                #"timestamp": time.monotonic(),
                 "pos_ticks": pos_ticks,
                 "pos_mm": round(pos_mm, 3),
                 "pos_inches": round(pos_in, 3),

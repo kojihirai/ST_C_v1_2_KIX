@@ -204,7 +204,7 @@ class MotorController:
     def publish_status(self):
         while self.running:
             status = {
-                "timestamp": time.monotonic(),
+                #"timestamp": time.monotonic(),
                 "mode": self.mode.value,
                 "direction": self.direction.value,
                 "target": self.target,

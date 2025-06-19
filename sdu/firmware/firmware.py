@@ -84,7 +84,7 @@ class SensorController:
             if meas:
                 try:
                     status = {
-                        "timestamp": time.monotonic(),
+                        # "timestamp": time.monotonic(),
                         "DRILL_CURRENT": float(meas["DRILL"]),
                         "POWER_CURRENT": float(meas["POWER"]),
                         "LINEAR_CURRENT": float(meas["LINEAR"]),
