@@ -3,8 +3,6 @@ import json
 import struct
 import threading
 import pigpio
-import board
-import busio
 import paho.mqtt.client as mqtt
 from enum import Enum
 
