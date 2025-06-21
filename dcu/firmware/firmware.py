@@ -121,9 +121,10 @@ class MotorController:
         self.pi = pigpio.pi()
         for pin in [MOTOR1_PINS["RPWM"], MOTOR1_PINS["LPWM"], MOTOR1_PINS["REN"], MOTOR1_PINS["LEN"]]:
             self.pi.set_mode(pin, pigpio.OUTPUT)
-            self.pi.write(pin, 0)
-        self.pi.write(MOTOR1_PINS["REN"], 1)
-        self.pi.write(MOTOR1_PINS["LEN"], 1)
+            self.pi.write(pin, 0)  # Ensure all pins start in disabled state
+        # Keep enable pins disabled until motor is commanded to run
+        # self.pi.write(MOTOR1_PINS["REN"], 1)  # Removed - don't enable on startup
+        # self.pi.write(MOTOR1_PINS["LEN"], 1)  # Removed - don't enable on startup
 
         self.torque_sensor = TorqueDriver(
             port="/dev/ttyACM0",
@@ -171,16 +172,27 @@ class MotorController:
     def set_motor(self, value):
         pwm_val = int(min(max(abs(value), 0), 100) * 2.55)
         forward = value >= 0 if self.direction == Direction.CW else value < 0
-        if forward:
-            self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], pwm_val)
-            self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], 0)
+        
+        if pwm_val > 0:  # Only enable motor driver when there's actual movement
+            self.pi.write(MOTOR1_PINS["REN"], 1)
+            self.pi.write(MOTOR1_PINS["LEN"], 1)
+            
+            if forward:
+                self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], pwm_val)
+                self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], 0)
+            else:
+                self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], 0)
+                self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], pwm_val)
         else:
-            self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], 0)
-            self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], pwm_val)
+            # Disable motor driver when no movement
+            self.stop_motor()
 
     def stop_motor(self):
         self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], 0)
         self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], 0)
+        # Disable motor driver when stopped
+        self.pi.write(MOTOR1_PINS["REN"], 0)
+        self.pi.write(MOTOR1_PINS["LEN"], 0)
 
     def run(self):
         while self.running:
