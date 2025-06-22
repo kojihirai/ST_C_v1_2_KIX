@@ -8,7 +8,7 @@ constexpr float VREF         = 3.3f;
 constexpr int   ADC_MAX      = 4095;
 constexpr float SENS_DRILL   = 0.1f;
 constexpr float SENS_POWER   = 0.1f;
-constexpr float SENS_LINEAR  = 0.1875f;
+constexpr float SENS_LINEAR  = 0.19125f;
 constexpr float SCALE_FACTOR = 100.0f;
 
 constexpr float MULT_DRILL  = VREF / ADC_MAX / SENS_DRILL  * SCALE_FACTOR;
