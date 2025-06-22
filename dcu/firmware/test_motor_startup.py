@@ -46,7 +46,7 @@ def test_motor_startup():
         pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], 128)  # 50% duty cycle
         pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], 0)
         
-        time.sleep(2)  # Let motor run for 2 seconds
+        time.sleep(10)  # Let motor run for 2 seconds
         
         # Disable motor driver (simulating stop_motor)
         print("   Disabling motor driver...")
