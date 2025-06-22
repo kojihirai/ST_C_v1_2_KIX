@@ -173,7 +173,7 @@ class MotorController:
         pwm_val = int(min(max(abs(value), 0), 100) * 2.55)
         forward = value >= 0 if self.direction == Direction.CW else value < 0
         
-        if pwm_val > 0:  # Only enable motor driver when there's actual movement
+        if pwm_val > 0:
             self.pi.write(MOTOR1_PINS["REN"], 1)
             self.pi.write(MOTOR1_PINS["LEN"], 1)
             

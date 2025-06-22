@@ -255,8 +255,9 @@ class MotorSystem:
         for pin in MOTOR_PINS.values():
             self.pi.set_mode(pin, pigpio.OUTPUT)
             self.pi.write(pin, 0)
-        self.pi.write(MOTOR_PINS["REN"], 1)
-        self.pi.write(MOTOR_PINS["LEN"], 1)
+        # Don't enable motor driver on startup - only enable when motor is actually commanded to run
+        # self.pi.write(MOTOR_PINS["REN"], 1)  # Removed - don't enable on startup
+        # self.pi.write(MOTOR_PINS["LEN"], 1)  # Removed - don't enable on startup
 
         self.pi.set_mode(ENC_A, pigpio.INPUT)
         self.pi.set_mode(ENC_B, pigpio.INPUT)
@@ -306,17 +307,24 @@ class MotorSystem:
 
     def control_motor(self, duty_percent, direction):
         duty = int(1_000_000 * max(min(duty_percent, DUTY_MAX), DUTY_MIN) / 100)
-        self.pi.write(MOTOR_PINS["REN"], 1)
-        self.pi.write(MOTOR_PINS["LEN"], 1)
-        if direction == Direction.FW:
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, duty)
-        elif direction == Direction.BW:
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, duty)
+        
+        if duty > 0:
+            # Enable motor driver only when there's actual movement
+            self.pi.write(MOTOR_PINS["REN"], 1)
+            self.pi.write(MOTOR_PINS["LEN"], 1)
+            
+            if direction == Direction.FW:
+                self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
+                self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, duty)
+            elif direction == Direction.BW:
+                self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
+                self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, duty)
         else:
+            # Disable motor driver when stopped
             self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
             self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
+            self.pi.write(MOTOR_PINS["REN"], 0)
+            self.pi.write(MOTOR_PINS["LEN"], 0)
 
     def on_message(self, client, userdata, msg):
         try:
