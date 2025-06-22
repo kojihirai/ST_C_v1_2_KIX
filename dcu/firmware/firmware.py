@@ -171,7 +171,9 @@ class MotorController:
 
     def set_motor(self, value):
         pwm_val = int(min(max(abs(value), 0), 100) * 2.55)
-        forward = value >= 0 if self.direction == Direction.CW else value < 0
+        # For CW direction: positive value = forward (RPWM), negative = reverse (LPWM)
+        # For CCW direction: positive value = reverse (LPWM), negative = forward (RPWM)
+        forward = (value >= 0) != (self.direction == Direction.CCW)
         
         if pwm_val > 0:
             self.pi.write(MOTOR1_PINS["REN"], 1)
