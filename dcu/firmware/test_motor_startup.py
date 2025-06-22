@@ -22,22 +22,6 @@ def test_motor_startup():
         return False
     
     try:
-        # Simulate the original problematic initialization
-        print("\n1. Testing ORIGINAL initialization (should cause motor to start):")
-        for pin in [MOTOR1_PINS["RPWM"], MOTOR1_PINS["LPWM"], MOTOR1_PINS["REN"], MOTOR1_PINS["LEN"]]:
-            pi.set_mode(pin, pigpio.OUTPUT)
-            pi.write(pin, 0)
-        
-        # This was the problem - enabling the driver on startup
-        pi.write(MOTOR1_PINS["REN"], 1)
-        pi.write(MOTOR1_PINS["LEN"], 1)
-        print("   Motor driver enabled on startup (ORIGINAL BEHAVIOR)")
-        print("   WARNING: This could cause motor to start unexpectedly!")
-        
-        # Clean up
-        pi.write(MOTOR1_PINS["REN"], 0)
-        pi.write(MOTOR1_PINS["LEN"], 0)
-        time.sleep(1)
         
         # Test the FIXED initialization
         print("\n2. Testing FIXED initialization (motor should stay stopped):")
