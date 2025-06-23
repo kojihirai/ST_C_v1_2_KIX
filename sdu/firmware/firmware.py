@@ -16,26 +16,23 @@ BROKER_IP = "192.168.2.1"
 DEVICE_ID = "sdu"
 SERIAL_PORT = "/dev/ttyACM0"
 BAUD_RATE = 6000000
-PACKET_SIZE = 7  # 3 x int16 + 1 sync byte
+PACKET_SIZE = 7
 SYNC_BYTE = b'\n'
 AMP_SCALE = 100.0
-BATCH_SIZE = 50  # Read multiple packets at once like speed test
+BATCH_SIZE = 50
 
 class SensorController:
     def __init__(self):
-        # MQTT setup
         self.client = mqtt.Client()
         self.client.connect(BROKER_IP, 1883, 60)
         self.client.loop_start()
         self.client.subscribe(f"{DEVICE_ID}/cmd")
         self.client.on_message = self.on_message
 
-        # Metadata
         self.project_id = 0
         self.experiment_id = 0
         self.run_id = 0
 
-        # Serial setup
         self.ser = serial.Serial(
             port=SERIAL_PORT,
             baudrate=BAUD_RATE,
@@ -46,46 +43,41 @@ class SensorController:
         )
         time.sleep(2)
 
-        # Buffer for handling high-speed data
         self.data_buffer = b''
         self.running = True
         threading.Thread(target=self.publish_status, daemon=True).start()
 
     def read_sensors(self):
         try:
-            # Read available data into buffer
             if self.ser.in_waiting > 0:
                 self.data_buffer += self.ser.read(self.ser.in_waiting)
             
-            # Process complete packets from buffer
+            # Process all complete packets in buffer
             while len(self.data_buffer) >= PACKET_SIZE:
-                # Look for sync byte to find packet boundary
-                sync_pos = self.data_buffer.find(SYNC_BYTE)
-                if sync_pos == -1:
-                    # No sync byte found, keep accumulating data
-                    break
-                
-                # Check if we have a complete packet ending with sync byte
-                if sync_pos == PACKET_SIZE - 1:
-                    # Extract the complete packet
+                # Look for sync byte at the end of a packet
+                if len(self.data_buffer) >= PACKET_SIZE and self.data_buffer[PACKET_SIZE - 1] == ord(SYNC_BYTE):
                     packet = self.data_buffer[:PACKET_SIZE]
                     self.data_buffer = self.data_buffer[PACKET_SIZE:]
                     
-                    # Verify packet integrity
-                    if len(packet) == PACKET_SIZE and packet[-1] == ord(SYNC_BYTE):
-                        # Unpack as 3 signed int16s, ignoring the sync byte
-                        raw_drill, raw_power, raw_linear = struct.unpack('<hhh', packet[:-1])
-                        # Ensure division is performed with float values
-                        return {
-                            "DRILL": float(raw_drill) / AMP_SCALE,
-                            "POWER": float(raw_power) / AMP_SCALE,
-                            "LINEAR": float(raw_linear) / AMP_SCALE
-                        }
+                    # Unpack the 3 int16 values (6 bytes) + sync byte (1 byte)
+                    raw_drill, raw_power, raw_linear = struct.unpack('<hhh', packet[:-1])
+                    return {
+                        "DRILL": float(raw_drill) / AMP_SCALE,
+                        "POWER": float(raw_power) / AMP_SCALE,
+                        "LINEAR": float(raw_linear) / AMP_SCALE
+                    }
                 else:
-                    # Sync byte not at expected position, remove data up to sync byte
-                    self.data_buffer = self.data_buffer[sync_pos + 1:]
+                    # Sync byte not found at expected position, advance buffer
+                    sync_pos = self.data_buffer.find(SYNC_BYTE)
+                    if sync_pos == -1:
+                        # No sync byte found, clear buffer
+                        self.data_buffer = b''
+                        break
+                    else:
+                        # Advance to after the sync byte
+                        self.data_buffer = self.data_buffer[sync_pos + 1:]
             
-            # If buffer gets too large, truncate it to prevent memory issues
+            # Prevent buffer from growing too large
             if len(self.data_buffer) > PACKET_SIZE * 10:
                 self.data_buffer = self.data_buffer[-PACKET_SIZE:]
                 
@@ -123,8 +115,7 @@ class SensorController:
                 except (ValueError, TypeError) as e:
                     self.send_error(f"Status publish error: {e}")
             else:
-                # If no data available, sleep briefly to prevent busy waiting
-                time.sleep(0.001)  # Reduced from 0.2 to 0.001 for better responsiveness
+                time.sleep(0.001)
 
     def send_error(self, msg):
         try:

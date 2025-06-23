@@ -18,9 +18,9 @@ from influxdb_client import InfluxDBClient
 
 # ─── CONFIG FROM ENVIRONMENT ────────────────────────────────────────────────────
 INFLUX_URL    = os.getenv("INFLUXDB_URL",    "http://10.147.18.184:8086")
-INFLUX_TOKEN  = os.getenv("INFLUXDB_TOKEN",  "")
-INFLUX_ORG    = os.getenv("INFLUXDB_ORG",    "")
-INFLUX_BUCKET = os.getenv("INFLUXDB_BUCKET", "")
+INFLUX_TOKEN  = os.getenv("INFLUXDB_TOKEN",  "rluK849_LVDKPRXuOqXFyI3tlJFoU-k4EHI0jb_dVa8ewNavNnAE4WV2-U2hIvUJ4uBx7fa5YXNsbAaOJOJEXw==")
+INFLUX_ORG    = os.getenv("INFLUXDB_ORG",    "sandwerx")
+INFLUX_BUCKET = os.getenv("INFLUXDB_BUCKET", "vehicle_telem")
 LIMIT         = int(os.getenv("INFLUX_LIMIT", "5"))
 
 if not all([INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET]):
