@@ -85,6 +85,45 @@ class SensorController:
             self.send_error(f"Sensor read error: {e}")
         return None
 
+    def read_sensors_batch(self):
+        """Read multiple packets at once like speed_test.py"""
+        try:
+            if self.ser.in_waiting >= PACKET_SIZE * BATCH_SIZE:
+                data = self.ser.read(PACKET_SIZE * BATCH_SIZE)
+                self.data_buffer += data
+                
+                # Process all complete packets
+                while len(self.data_buffer) >= PACKET_SIZE:
+                    if self.data_buffer[PACKET_SIZE - 1] == ord(SYNC_BYTE):
+                        packet = self.data_buffer[:PACKET_SIZE]
+                        self.data_buffer = self.data_buffer[PACKET_SIZE:]
+                        
+                        raw_drill, raw_power, raw_linear = struct.unpack('<hhh', packet[:-1])
+                        return {
+                            "DRILL": float(raw_drill) / AMP_SCALE,
+                            "POWER": float(raw_power) / AMP_SCALE,
+                            "LINEAR": float(raw_linear) / AMP_SCALE
+                        }
+                    else:
+                        # Find next sync byte
+                        sync_pos = self.data_buffer.find(SYNC_BYTE)
+                        if sync_pos == -1:
+                            self.data_buffer = b''
+                            break
+                        self.data_buffer = self.data_buffer[sync_pos + 1:]
+                
+                # Also check for any remaining data
+                if self.ser.in_waiting > 0:
+                    self.data_buffer += self.ser.read(self.ser.in_waiting)
+                    
+            # Prevent buffer overflow
+            if len(self.data_buffer) > PACKET_SIZE * 20:
+                self.data_buffer = self.data_buffer[-PACKET_SIZE:]
+                
+        except Exception as e:
+            self.send_error(f"Batch sensor read error: {e}")
+        return None
+
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
@@ -98,12 +137,23 @@ class SensorController:
             self.run_id = 0
 
     def publish_status(self):
+        last_publish_time = time.time()
+        publish_interval = 0.01  # Publish every 10ms
+        consecutive_failures = 0
+        
         while self.running:
-            meas = self.read_sensors()
-            if meas:
-                try:
+            try:
+                # Try batch reading first, then fallback to single packet
+                meas = self.read_sensors_batch()
+                if not meas:
+                    meas = self.read_sensors()
+                
+                current_time = time.time()
+                
+                if meas:
+                    consecutive_failures = 0
                     status = {
-                        # "timestamp": time.monotonic(),
+                        "timestamp": current_time,
                         "DRILL_CURRENT": float(meas["DRILL"]),
                         "POWER_CURRENT": float(meas["POWER"]),
                         "LINEAR_CURRENT": float(meas["LINEAR"]),
@@ -111,11 +161,38 @@ class SensorController:
                         "experiment_id": int(self.experiment_id),
                         "run_id": int(self.run_id)
                     }
+                    
+                    # Publish immediately if we have data
                     self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
-                except (ValueError, TypeError) as e:
-                    self.send_error(f"Status publish error: {e}")
-            else:
+                    last_publish_time = current_time
+                    
+                else:
+                    consecutive_failures += 1
+                    # If we haven't published in a while, send a status update anyway
+                    if current_time - last_publish_time > 0.1:  # 100ms
+                        status = {
+                            "timestamp": current_time,
+                            "DRILL_CURRENT": 0.0,
+                            "POWER_CURRENT": 0.0,
+                            "LINEAR_CURRENT": 0.0,
+                            "project_id": int(self.project_id),
+                            "experiment_id": int(self.experiment_id),
+                            "run_id": int(self.run_id),
+                            "status": "no_data"
+                        }
+                        self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
+                        last_publish_time = current_time
+                        
+                        if consecutive_failures > 100:  # Log after 100 consecutive failures
+                            print(f"Warning: No sensor data for {consecutive_failures} cycles")
+                            consecutive_failures = 0
+                
+                # Small delay to prevent excessive CPU usage
                 time.sleep(0.001)
+                
+            except Exception as e:
+                self.send_error(f"Publish status error: {e}")
+                time.sleep(0.01)
 
     def send_error(self, msg):
         try:
