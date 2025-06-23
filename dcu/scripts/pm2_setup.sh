@@ -18,27 +18,27 @@ VENV_PATH="$(pwd)/venv/bin/python3"
 cat > ecosystem.config.js << EOL
 module.exports = {
   apps: [
-    {
-      name: 'ota-service',
-      script: 'ota/ota.py',
-      interpreter: '${VENV_PATH}',
-      watch: false,
-      autorestart: true,
-      max_restarts: 10,
-      restart_delay: 5000,
-      env: {
-        NODE_ENV: 'production',
-        PYTHONUNBUFFERED: '1',
-        PYTHONPATH: '$(pwd)',
-        PATH: '$(pwd)/venv/bin:${PATH}'
-      },
-      error_file: 'logs/ota-error.log',
-      out_file: 'logs/ota-out.log',
-      log_file: 'logs/ota-combined.log',
-      time: true,
-      merge_logs: true,
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
-    },
+    // {
+    //   name: 'ota-service',
+    //   script: 'ota/ota.py',
+    //   interpreter: '${VENV_PATH}',
+    //   watch: false,
+    //   autorestart: true,
+    //   max_restarts: 10,
+    //   restart_delay: 5000,
+    //   env: {
+    //     NODE_ENV: 'production',
+    //     PYTHONUNBUFFERED: '1',
+    //     PYTHONPATH: '$(pwd)',
+    //     PATH: '$(pwd)/venv/bin:${PATH}'
+    //   },
+    //   error_file: 'logs/ota-error.log',
+    //   out_file: 'logs/ota-out.log',
+    //   log_file: 'logs/ota-combined.log',
+    //   time: true,
+    //   merge_logs: true,
+    //   log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+    // },
     {
       name: 'firmware-service',
       script: 'firmware/firmware.py',
