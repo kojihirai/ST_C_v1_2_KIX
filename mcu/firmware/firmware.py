@@ -1,3 +1,4 @@
+# ... (imports unchanged)
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,10 +8,71 @@ import asyncpg
 import psycopg2
 import psycopg2.extras
 import json
+import os
 import asyncio
 import signal
+import threading
+import cv2
 import paho.mqtt.client as mqtt
 
+# --- Video Recorder ---
+class VideoRecorder:
+    def __init__(self, save_dir="/media/pi/USB", fps=20, resolution=(640, 480)):
+        self.save_dir = save_dir
+        self.fps = fps
+        self.resolution = resolution
+        self.out = None
+        self.cap = None
+        self.running = False
+        self.thread = None
+        self.lock = threading.Lock()
+        self.filename = None
+
+    def _record(self, filename):
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        self.out = cv2.VideoWriter(filename, fourcc, self.fps, self.resolution)
+
+        while self.running and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if ret:
+                self.out.write(frame)
+            else:
+                break
+
+        self._cleanup()
+
+    def _cleanup(self):
+        if self.out:
+            self.out.release()
+        if self.cap:
+            self.cap.release()
+
+    def start(self, run_id):
+        with self.lock:
+            if self.running:
+                return
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = os.path.join(self.save_dir, f"run_{run_id}_{timestamp}.avi")
+            self.running = True
+            self.filename = filename
+            self.thread = threading.Thread(target=self._record, args=(filename,))
+            self.thread.start()
+
+    def stop(self):
+        with self.lock:
+            if not self.running:
+                return None
+            self.running = False
+            if self.thread:
+                self.thread.join()
+            return self.filename
+
+video_recorder = VideoRecorder()
+
+# --- Models ---
 class Project(BaseModel):
     project_id: int
     project_name: str
@@ -32,24 +94,6 @@ class RunEndRequest(BaseModel):
     status: str = None
     notes: str = None
 
-class RunCreateRequest(BaseModel):
-    time_start: datetime | None = None
-    time_end: datetime | None = None
-    status: str | None = None
-    notes: str | None = None
-
-class ProjectCreate(BaseModel):
-    project_name: str
-    project_description: Optional[str]
-    project_params: Optional[dict]
-    project_controls: Optional[dict]
-
-class ExperimentCreate(BaseModel):
-    project_id: int
-    experiment_name: str
-    experiment_description: Optional[str]
-    experiment_params: Optional[dict]
-
 class RunCreate(BaseModel):
     run_name: str
     run_status: str
@@ -58,22 +102,14 @@ class RunCreate(BaseModel):
     start_time: Optional[datetime] = None
     stop_time: Optional[datetime] = None
 
-class RunVideoCreate(BaseModel):
-    run_id: int
-    video_path: str
-
-
+# --- FastAPI Setup ---
 app = FastAPI()
 
 origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-    "http://mcu.local:3001",
-    "http://10.147.18.184:3001",
-    "http://10.147.18.184:8000",
-    "http://192.168.2.1:3001",
+    "http://localhost:3000", "http://localhost:3001",
+    "http://127.0.0.1:3000", "http://127.0.0.1:3001",
+    "http://mcu.local:3001", "http://10.147.18.184:3001",
+    "http://10.147.18.184:8000", "http://192.168.2.1:3001",
     "http://102.168.2.10:3001"
 ]
 
@@ -86,8 +122,7 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-# --- Database ---
-
+# --- DB Setup ---
 DATABASE_URL = "postgresql://dune:dune1234@localhost:5432/data_mgmt"
 db_pool = None
 
@@ -97,33 +132,7 @@ def get_conn():
 async def get_db():
     return await db_pool.acquire()
 
-def update_project_experiment_count(conn, project_id):
-    """Recalculate and update the experiment count for a project"""
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            SELECT COUNT(*) FROM experiments WHERE project_id = %s
-        """, (project_id,))
-        count = cur.fetchone()[0]
-        
-        cur.execute("""
-            UPDATE projects 
-            SET experiment_count = %s,
-                modified_at = CURRENT_TIMESTAMP
-            WHERE project_id = %s
-        """, (count, project_id))
-        
-        conn.commit()
-        return count
-    except Exception as e:
-        conn.rollback()
-        print(f"Error updating experiment count: {e}")
-        return None
-    finally:
-        cur.close()
-
 # --- Runtime State ---
-
 device_data = {}
 expected_devices = ["lcu", "dcu"]
 active_clients = []
@@ -134,8 +143,25 @@ current_run_info = {
     "project_id": 0
 }
 
-# --- WebSocket ---
+# --- MQTT ---
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+mqtt_client = mqtt.Client()
 
+def on_mqtt_message(client, userdata, message):
+    try:
+        payload = json.loads(message.payload.decode())
+        device = message.topic.split('/')[0]
+        if device in expected_devices:
+            device_data[device] = payload
+    except Exception as e:
+        print(f"Error processing MQTT message: {e}")
+
+mqtt_client.on_message = on_mqtt_message
+mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
+mqtt_client.loop_start()
+
+# --- WebSocket ---
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, db=Depends(get_db)):
     await websocket.accept()
@@ -151,397 +177,40 @@ async def websocket_endpoint(websocket: WebSocket, db=Depends(get_db)):
         active_clients.remove(websocket)
         await db_pool.release(db)
 
-# --- MQTT Setup ---
-
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
-mqtt_client = mqtt.Client()
-
-def on_mqtt_message(client, userdata, message):
-    """Handle incoming MQTT messages"""
-    try:
-        payload = json.loads(message.payload.decode())
-        device = message.topic.split('/')[0]
-        if device in expected_devices:
-            device_data[device] = payload
-    except Exception as e:
-        print(f"Error processing MQTT message: {e}")
-
-mqtt_client.on_message = on_mqtt_message
-mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
-mqtt_client.loop_start()
-
+# --- Send Command with Video Trigger ---
 @app.post("/send_command/")
 async def send_command(payload: CommandRequest):
     if payload.device not in expected_devices:
         return {"success": False, "message": "Invalid device"}
 
+    run_id = current_run_info["run_id"]
+    device = payload.device
+    command = payload.command
+
     command_with_ids = {
-        **payload.command,
+        **command,
         "project_id": current_run_info["project_id"] or 0,
         "experiment_id": current_run_info["experiment_id"] or 0,
-        "run_id": current_run_info["run_id"] or 0
+        "run_id": run_id or 0
     }
 
-    mqtt_client.publish(f"{payload.device}/cmd", json.dumps(command_with_ids))
-    return {"success": True, "message": f"Command sent to {payload.device}"}
+    prev_mode = device_data.get(device, {}).get("mode", 0)
+    new_mode = command.get("mode", prev_mode)
 
-# --- Projects ---
+    if prev_mode == 0 and new_mode != 0:
+        print(f"🎥 Starting video recording for run {run_id}")
+        video_recorder.start(run_id)
 
-@app.post("/projects")
-def create_project(data: ProjectCreate):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO projects (project_name, project_description, project_params, project_controls)
-        VALUES (%s, %s, %s, %s) RETURNING project_id;
-    """, (data.project_name, data.project_description, json.dumps(data.project_params), json.dumps(data.project_controls)))
-    conn.commit()
-    return {"project_id": cur.fetchone()[0]}
+    elif prev_mode != 0 and new_mode == 0:
+        print(f"🛑 Stopping video recording for run {run_id}")
+        video_path = video_recorder.stop()
+        if video_path:
+            print(f"✅ Video saved to {video_path}")
 
-@app.get("/projects/{project_id}", response_model=Project)
-def get_project(project_id: int):
-    conn = get_conn()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute("""
-        SELECT 
-            project_id,
-            project_name,
-            project_description,
-            project_params,
-            project_controls,
-            experiment_count,
-            created_at,
-            modified_at
-        FROM projects 
-        WHERE project_id = %s;
-    """, (project_id,))
-    project = cur.fetchone()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail=f"Project with ID {project_id} not found")
-    
-    cur.close()
-    conn.close()
-    return project
+    mqtt_client.publish(f"{device}/cmd", json.dumps(command_with_ids))
+    return {"success": True, "message": f"Command sent to {device}"}
 
-@app.get("/projects", response_model=List[Project])
-def get_projects():
-    conn = get_conn()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute("""
-        SELECT 
-            project_id,
-            project_name,
-            project_description,
-            project_params,
-            project_controls,
-            experiment_count,
-            created_at,
-            modified_at
-        FROM projects 
-        ORDER BY created_at DESC;
-    """)
-    projects = cur.fetchall()
-    
-    cur.close()
-    conn.close()
-    return projects
-
-@app.put("/projects/{project_id}")
-def update_project(project_id: int, data: ProjectCreate):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("""
-        UPDATE projects 
-        SET project_name = %s,
-            project_description = %s,
-            project_params = %s,
-            project_controls = %s,
-            modified_at = CURRENT_TIMESTAMP
-        WHERE project_id = %s;
-    """, (
-        data.project_name,
-        data.project_description,
-        json.dumps(data.project_params),
-        json.dumps(data.project_controls),
-        project_id
-    ))
-    conn.commit()
-    return {"message": f"Project {project_id} updated."}
-
-@app.delete("/projects/{project_id}")
-def delete_project(project_id: int):
-    conn = get_conn()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        cur.execute("DELETE FROM run_videos WHERE run_id IN (SELECT run_id FROM runs WHERE experiment_id IN (SELECT experiment_id FROM experiments WHERE project_id = %s));", (project_id,))
-        
-        cur.execute("DELETE FROM runs WHERE experiment_id IN (SELECT experiment_id FROM experiments WHERE project_id = %s);", (project_id,))
-        
-        cur.execute("DELETE FROM experiments WHERE project_id = %s;", (project_id,))
-        
-        cur.execute("DELETE FROM projects WHERE project_id = %s;", (project_id,))
-        
-        conn.commit()
-        
-        return {"message": f"Project {project_id} and all related data deleted successfully."}
-    except Exception as e:
-        conn.rollback()
-        print(f"Error deleting project: {e}")
-        raise HTTPException(status_code=500, detail=f"Error deleting project: {str(e)}")
-    finally:
-        cur.close()
-        conn.close()
-
-# --- Experiments ---
-
-@app.post("/experiments")
-def create_experiment(data: ExperimentCreate):
-    conn = get_conn()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-
-        cur.execute("""
-            INSERT INTO experiments (project_id, experiment_name, experiment_description, experiment_params)
-            VALUES (%s, %s, %s, %s) RETURNING experiment_id;
-        """, (data.project_id, data.experiment_name, data.experiment_description, json.dumps(data.experiment_params)))
-        
-        experiment_id = cur.fetchone()[0]
-        
-        update_project_experiment_count(conn, data.project_id)
-        
-        conn.commit()
-        
-        return {"experiment_id": experiment_id}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating experiment: {str(e)}")
-    finally:
-        cur.close()
-        conn.close()
-
-@app.get("/projects/{project_id}/experiments")
-def get_experiments(project_id: int):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT * FROM experiments WHERE project_id = %s;", (project_id,))
-    return cur.fetchall()
-
-@app.get("/projects/{project_id}/experiments/{experiment_id}")
-def get_experiment(project_id: int, experiment_id: int):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT * FROM experiments WHERE project_id = %s AND experiment_id = %s;", (project_id, experiment_id))
-    return cur.fetchone()
-
-@app.put("/projects/{project_id}/experiments/{experiment_id}")
-def update_experiment(project_id: int, experiment_id: int, data: ExperimentCreate):
-    conn = get_conn()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        cur.execute("SELECT 1 FROM experiments WHERE experiment_id = %s AND project_id = %s", (experiment_id, project_id))
-        if not cur.fetchone():
-            raise HTTPException(status_code=404, detail=f"Experiment {experiment_id} not found in project {project_id}")
-        
-        cur.execute("""
-            UPDATE experiments
-            SET experiment_name = %s,
-                experiment_description = %s,
-                experiment_params = %s,
-                modified_at = CURRENT_TIMESTAMP
-            WHERE experiment_id = %s AND project_id = %s;
-        """, (
-            data.experiment_name,
-            data.experiment_description,
-            json.dumps(data.experiment_params),
-            experiment_id,
-            project_id
-        ))
-        
-        conn.commit()
-        
-        return {"message": f"Experiment {experiment_id} updated."}
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating experiment: {str(e)}")
-    finally:
-        cur.close()
-        conn.close()
-
-@app.delete("/projects/{project_id}/experiments/{experiment_id}")
-def delete_experiment(project_id: int, experiment_id: int):
-    conn = get_conn()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        cur.execute("DELETE FROM experiments WHERE experiment_id = %s AND project_id = %s;", (experiment_id, project_id))
-
-        update_project_experiment_count(conn, project_id)
-        
-        conn.commit()
-        
-        return {"message": f"Experiment {experiment_id} deleted."}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting experiment: {str(e)}")
-    finally:
-        cur.close()
-        conn.close()
-
-# --- Runs ---
-
-@app.post("/projects/{project_id}/experiments/{experiment_id}/runs")
-def create_run(project_id: int, experiment_id: int, data: RunCreate):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO runs (project_id, experiment_id, run_name, run_description, run_params, run_status, start_time, stop_time)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING run_id;
-    """, (
-        project_id,
-        experiment_id,
-        data.run_name,
-        data.run_description,
-        json.dumps(data.run_params),
-        data.run_status,
-        data.start_time,
-        data.stop_time
-    ))
-    run_id = cur.fetchone()[0]
-    conn.commit()
-    
-    # Update current run info
-    current_run_info["run_id"] = run_id
-    current_run_info["experiment_id"] = experiment_id
-    current_run_info["project_id"] = project_id
-    
-    return {"run_id": run_id}
-
-@app.get("/projects/{project_id}/experiments/{experiment_id}/runs")
-def get_runs(project_id: int, experiment_id: int):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT * FROM runs WHERE experiment_id = %s ORDER BY created_at DESC;", (experiment_id,))
-    return cur.fetchall()
-
-@app.delete("/projects/{project_id}/experiments/{experiment_id}/runs/{run_id}")
-def delete_run(project_id: int, experiment_id: int, run_id: int):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("DELETE FROM runs WHERE run_id = %s;", (run_id,))
-    conn.commit()
-    return {"message": f"Run {run_id} deleted."}
-
-@app.post("/projects/{project_id}/experiments/{experiment_id}/runs/{run_id}/stop")
-async def stop_run(project_id: int, experiment_id: int, run_id: int, req: RunEndRequest, db=Depends(get_db)):
-    stop_time = datetime.utcnow()
-    status = req.status or "completed"
-    notes = req.notes or ""
-
-    update_query = """
-        UPDATE runs
-        SET stop_time = $1, run_status = $2, run_description = COALESCE(run_description, '') || $3
-        WHERE run_id = $4
-    """
-    await db.execute(update_query, stop_time, status, f"\n[STOPPED @ {stop_time.isoformat()}] {notes}", run_id)
-    await db_pool.release(db)
-
-    if current_run_info["run_id"] == run_id:
-        current_run_info["run_id"] = 0
-        current_run_info["experiment_id"] = 0
-        current_run_info["project_id"] = 0
-
-    return {
-        "message": f"✅ Run {run_id} stopped.",
-        "stop_time": stop_time.isoformat(),
-        "status": status
-    }
-
-# --- Run Videos ---
-
-@app.post("/projects/{project_id}/experiments/{experiment_id}/runs/{run_id}/videos")
-def create_video(project_id: int, experiment_id: int, run_id: int, data: RunVideoCreate):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("INSERT INTO run_videos (run_id, video_path) VALUES (%s, %s) RETURNING video_id;", (data.run_id, data.video_path))
-    conn.commit()
-    return {"video_id": cur.fetchone()[0]}
-
-@app.get("/projects/{project_id}/experiments/{experiment_id}/runs/{run_id}/videos")
-def get_videos(project_id: int, experiment_id: int, run_id: int):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("SELECT * FROM run_videos WHERE run_id = %s;", (run_id,))
-    return cur.fetchall()
-
-# --- Emergency Stop ---
-
-@app.post("/projects/{project_id}/experiments/{experiment_id}/runs/{run_id}/emergency_stop")
-async def emergency_stop(project_id: int, experiment_id: int, run_id: int, db=Depends(get_db)):
-    emergency_command = {
-        "mode": 0,
-        "speed": 0,
-        "position": 0,
-        "current": 0,
-        "load": 0
-    }
-
-    for device in expected_devices:
-        mqtt_client.publish(f"{device}/cmd", json.dumps(emergency_command))
-
-    if current_run_info["run_id"]:
-        run_id = current_run_info["run_id"]
-        stop_time = datetime.utcnow()
-
-        update_query = """
-            UPDATE runs 
-            SET stop_time = $1,
-                run_status = 'aborted',
-                run_description = COALESCE(run_description, '') || $2
-            WHERE run_id = $3;
-        """
-        emergency_note = f"\n[EMERGENCY STOP at {stop_time.isoformat()}]"
-
-        await db.execute(update_query, stop_time, emergency_note, run_id)
-        await db_pool.release(db)
-
-        current_run_info["run_id"] = 0
-        current_run_info["experiment_id"] = 0
-        current_run_info["project_id"] = 0
-
-        return {
-            "message": "Emergency stop triggered. Run aborted.",
-            "run_id": run_id,
-            "stop_time": stop_time.isoformat(),
-            "status": "aborted"
-        }
-
-    return {
-        "message": "Emergency stop triggered. No active run to abort."
-    }
-
-@app.post("/projects/{project_id}/experiments/{experiment_id}/reset")
-async def reset_experiment(project_id: int, experiment_id: int):
-    homing_command = {
-        "command": "homing",
-        "project_id": project_id,
-        "experiment_id": experiment_id
-    }
-    mqtt_client.publish("lcu/cmd", json.dumps(homing_command))
-    
-    return {
-        "message": "🔄 Homing command sent to LCU",
-        "project_id": project_id,
-        "experiment_id": experiment_id
-    }
-
-# --- Startup & Shutdown ---
-
+# --- Startup/Shutdown ---
 @app.on_event("startup")
 async def startup():
     global db_pool
@@ -550,12 +219,18 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     await db_pool.close()
-
-def signal_handler(sig, frame):
-    print("\nKeyboard Interrupt detected! Shutting down gracefully...")
+    if video_recorder.running:
+        print("🔄 Graceful shutdown: stopping video...")
+        video_recorder.stop()
     mqtt_client.loop_stop()
     mqtt_client.disconnect()
 
+# --- Signal Handling ---
+def signal_handler(sig, frame):
+    print("\nKeyboard Interrupt detected! Shutting down gracefully...")
+    asyncio.get_event_loop().create_task(shutdown())
+
+# --- Run ---
 def main():
     import uvicorn
     signal.signal(signal.SIGINT, signal_handler)
