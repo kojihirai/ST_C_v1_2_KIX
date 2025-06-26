@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 # === CONFIGURATION ===
-USB_MOUNT_PATH = "/media/pi/USB"  # Update this if your USB drive is mounted elsewhere
+USB_MOUNT_PATH = "/media/pi/BEA6-BBCE"  # Update this if your USB drive is mounted elsewhere
 FILENAME = f"video_{datetime.now().strftime('%Y%m%d_%H%M%S')}.avi"
 SAVE_PATH = os.path.join(USB_MOUNT_PATH, FILENAME)
 
