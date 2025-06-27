@@ -1,8 +1,7 @@
-# ... (imports unchanged)
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, Dict
 from datetime import datetime
 import asyncpg
 import psycopg2
@@ -73,19 +72,6 @@ class VideoRecorder:
 video_recorder = VideoRecorder()
 
 # --- Models ---
-class Project(BaseModel):
-    project_id: int
-    project_name: str
-    project_description: Optional[str]
-    project_params: Optional[Dict]
-    project_controls: Optional[Dict]
-    experiment_count: Optional[int] = 0
-    created_at: datetime
-    modified_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-
 class CommandRequest(BaseModel):
     device: str
     command: dict
@@ -172,7 +158,7 @@ async def websocket_endpoint(websocket: WebSocket, db=Depends(get_db)):
             print(f"Received: {message}")
             await websocket.send_text(f"Server Response: {message}")
     except WebSocketDisconnect:
-        print("⚠️ Client disconnected")
+        print("\u26a0\ufe0f Client disconnected")
     finally:
         active_clients.remove(websocket)
         await db_pool.release(db)
@@ -198,14 +184,14 @@ async def send_command(payload: CommandRequest):
     new_mode = command.get("mode", prev_mode)
 
     if prev_mode == 0 and new_mode != 0:
-        print(f"🎥 Starting video recording for run {run_id}")
+        print(f"\U0001f3a5 Starting video recording for run {run_id}")
         video_recorder.start(run_id)
 
     elif prev_mode != 0 and new_mode == 0:
-        print(f"🛑 Stopping video recording for run {run_id}")
+        print(f"\U0001f6d1 Stopping video recording for run {run_id}")
         video_path = video_recorder.stop()
         if video_path:
-            print(f"✅ Video saved to {video_path}")
+            print(f"\u2705 Video saved to {video_path}")
 
     mqtt_client.publish(f"{device}/cmd", json.dumps(command_with_ids))
     return {"success": True, "message": f"Command sent to {device}"}
@@ -220,7 +206,7 @@ async def startup():
 async def shutdown():
     await db_pool.close()
     if video_recorder.running:
-        print("🔄 Graceful shutdown: stopping video...")
+        print("\U0001f504 Graceful shutdown: stopping video...")
         video_recorder.stop()
     mqtt_client.loop_stop()
     mqtt_client.disconnect()
