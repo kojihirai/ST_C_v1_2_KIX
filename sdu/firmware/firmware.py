@@ -153,13 +153,11 @@ class SensorController:
                 if meas:
                     consecutive_failures = 0
                     status = {
-                        "timestamp": current_time,
+                        # "timestamp": current_time,
                         "DRILL_CURRENT": float(meas["DRILL"]),
                         "POWER_CURRENT": float(meas["POWER"]),
                         "LINEAR_CURRENT": float(meas["LINEAR"]),
-                        "project_id": int(self.project_id),
-                        "experiment_id": int(self.experiment_id),
-                        "run_id": int(self.run_id)
+                        "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
                     }
                     
                     # Publish immediately if we have data
@@ -171,24 +169,20 @@ class SensorController:
                     # If we haven't published in a while, send a status update anyway
                     if current_time - last_publish_time > 0.1:  # 100ms
                         status = {
-                            "timestamp": current_time,
+                            # "timestamp": current_time,
                             "DRILL_CURRENT": 0.0,
                             "POWER_CURRENT": 0.0,
                             "LINEAR_CURRENT": 0.0,
-                            "project_id": int(self.project_id),
-                            "experiment_id": int(self.experiment_id),
-                            "run_id": int(self.run_id),
-                            "status": "no_data"
+                            "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
                         }
                         self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
                         last_publish_time = current_time
                         
-                        if consecutive_failures > 100:  # Log after 100 consecutive failures
+                        if consecutive_failures > 100:
                             print(f"Warning: No sensor data for {consecutive_failures} cycles")
                             consecutive_failures = 0
                 
-                # Small delay to prevent excessive CPU usage
-                time.sleep(0.001)
+                time.sleep(0.01)
                 
             except Exception as e:
                 self.send_error(f"Publish status error: {e}")

@@ -106,51 +106,51 @@ class LoadCellDriver:
 
 
 # ----------------------------------------------------
-# HighSpeedLogger Class (unchanged)
+# HighSpeedLogger Class
 # ----------------------------------------------------
-class HighSpeedLogger:
-    def __init__(self, filename="lcu_highspeed_log.csv"):
-        self.filename = filename
-        self.file = open(self.filename, mode='w', newline='', buffering=1)
-        self.csv_writer = csv.writer(self.file)
-        self.csv_writer.writerow([
-            "timestamp", "pos_ticks", "pos_mm", "pos_inches",
-            "current", "load", "current_speed"
-        ])
-        self.queue = Queue(maxsize=100000)
-        self.running = True
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
+# class HighSpeedLogger:
+#     def __init__(self, filename="lcu_highspeed_log.csv"):
+#         self.filename = filename
+#         self.file = open(self.filename, mode='w', newline='', buffering=1)
+#         self.csv_writer = csv.writer(self.file)
+#         self.csv_writer.writerow([
+#             "timestamp", "pos_ticks", "pos_mm", "pos_inches",
+#             "current", "load", "current_speed"
+#         ])
+#         self.queue = Queue(maxsize=100000)
+#         self.running = True
+#         self.thread = threading.Thread(target=self._run, daemon=True)
+#         self.thread.start()
 
-    def log(self, data: dict):
-        if not self.running:
-            return
-        try:
-            self.queue.put_nowait(data)
-        except:
-            pass
+#     def log(self, data: dict):
+#         if not self.running:
+#             return
+#         try:
+#             self.queue.put_nowait(data)
+#         except:
+#             pass
 
-    def _run(self):
-        while self.running:
-            record = self.queue.get()
-            if record is None:
-                break
-            row = [
-                record.get("timestamp", time.monotonic()),
-                record.get("pos_ticks", 0),
-                record.get("pos_mm", 0.0),
-                record.get("pos_inches", 0.0),
-                record.get("current", 0.0),
-                record.get("load", 0.0),
-                record.get("current_speed", 0.0)
-            ]
-            self.csv_writer.writerow(row)
+#     def _run(self):
+#         while self.running:
+#             record = self.queue.get()
+#             if record is None:
+#                 break
+#             row = [
+#                 record.get("timestamp", time.monotonic()),
+#                 record.get("pos_ticks", 0),
+#                 record.get("pos_mm", 0.0),
+#                 record.get("pos_inches", 0.0),
+#                 record.get("current", 0.0),
+#                 record.get("load", 0.0),
+#                 record.get("current_speed", 0.0)
+#             ]
+#             self.csv_writer.writerow(row)
 
-    def stop(self):
-        self.running = False
-        self.queue.put(None)
-        self.thread.join()
-        self.file.close()
+#     def stop(self):
+#         self.running = False
+#         self.queue.put(None)
+#         self.thread.join()
+#         self.file.close()
 
 
 # ----------------------------------------------------
@@ -255,9 +255,6 @@ class MotorSystem:
         for pin in MOTOR_PINS.values():
             self.pi.set_mode(pin, pigpio.OUTPUT)
             self.pi.write(pin, 0)
-        # Don't enable motor driver on startup - only enable when motor is actually commanded to run
-        # self.pi.write(MOTOR_PINS["REN"], 1)  # Removed - don't enable on startup
-        # self.pi.write(MOTOR_PINS["LEN"], 1)  # Removed - don't enable on startup
 
         self.pi.set_mode(ENC_A, pigpio.INPUT)
         self.pi.set_mode(ENC_B, pigpio.INPUT)
@@ -281,7 +278,7 @@ class MotorSystem:
         else:
             print("Load cell connection failed")
 
-        self.logger = HighSpeedLogger()
+        # self.logger = HighSpeedLogger()
 
         self.running = True
         threading.Thread(target=self.run_loop, daemon=True).start()
@@ -309,7 +306,6 @@ class MotorSystem:
         duty = int(1_000_000 * max(min(duty_percent, DUTY_MAX), DUTY_MIN) / 100)
         
         if duty > 0:
-            # Enable motor driver only when there's actual movement
             self.pi.write(MOTOR_PINS["REN"], 1)
             self.pi.write(MOTOR_PINS["LEN"], 1)
             
@@ -320,7 +316,6 @@ class MotorSystem:
                 self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
                 self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, duty)
         else:
-            # Disable motor driver when stopped
             self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
             self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
             self.pi.write(MOTOR_PINS["REN"], 0)
@@ -417,13 +412,13 @@ class MotorSystem:
             else:
                 self.control_motor(0, Direction.IDLE)
 
-            time.sleep(0.001)
+            time.sleep(0.01)
 
     def send_data_loop(self):
         while self.running:
             pos_ticks = self.encoder_pos
             pos_mm    = pos_ticks / PULSES_PER_MM
-            pos_in    = pos_mm / 25.4
+            # pos_in    = pos_mm / 25.4
             load_val  = 0.0
             try:
                 load_val = self.load_cell.read_parameter(0x00, length=2, signed=True) or 0.0
@@ -435,21 +430,21 @@ class MotorSystem:
                 #"timestamp": time.monotonic(),
                 "pos_ticks": pos_ticks,
                 "pos_mm": round(pos_mm, 3),
-                "pos_inches": round(pos_in, 3),
-                "current": 0.0,
+                # "pos_inches": round(pos_in, 3),
+                # "current": 0.0,
                 "load": load_val,
-                "current_speed": round(self.current_speed, 3)
+                "current_speed": round(self.current_speed, 3),
+                "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
             }
 
-            self.logger.log(data)
+            # self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
-            # print(f"Published: {data}")
             time.sleep(0.2)
 
     def stop(self):
         self.running = False
         self.control_motor(0, Direction.IDLE)
-        self.logger.stop()
+        # self.logger.stop()
         self.client.loop_stop()
         self.pi.stop()
         self.load_cell.disconnect()

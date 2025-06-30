@@ -12,9 +12,7 @@ import time
 
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "dcu"
-
 MOTOR1_PINS = {"RPWM": 12, "LPWM": 13, "REN": 23, "LEN": 24}
-
 
 class TorqueDriver:
     def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
@@ -106,8 +104,6 @@ class MotorController:
         self.mode = Mode.IDLE
         self.direction = Direction.IDLE
         self.target = 50
-        self.duration = 0
-        self.pid_setpoint = 0
 
         self.torque_value = 0.0
         self.torque_offset = 0.0
@@ -160,12 +156,10 @@ class MotorController:
             self.mode = Mode(data.get("mode", 0))
             self.direction = Direction(data.get("direction", 0))
             self.target = data.get("target", 50)
-            self.duration = data.get("duration", 0)
-            self.pid_setpoint = data.get("pid_setpoint", 0)
             self.project_id = data.get("project_id", 0)
             self.experiment_id = data.get("experiment_id", 0)
             self.run_id = data.get("run_id", 0)
-            print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}, Speed={self.target}, Setpoint={self.pid_setpoint}")
+            print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}, Speed={self.target}")
         except Exception as e:
             self.send_error(f"MQTT command error: {e}")
 
@@ -202,7 +196,6 @@ class MotorController:
                 self.stop_motor()
 
             elif self.mode == Mode.RUN_CONTINUOUS:
-
                 target = self.target * 100 / 24
                 self.set_motor(target)
             
@@ -219,12 +212,9 @@ class MotorController:
                 "mode": self.mode.value,
                 "direction": self.direction.value,
                 "target": self.target,
-                "setpoint": self.pid_setpoint,
                 "rpm": round(self.rpm_value, 1),
                 "torque": round(self.torque_value, 2),
-                "project_id": self.project_id,
-                "experiment_id": self.experiment_id,
-                "run_id": self.run_id
+                "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
             }
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
             # print("Status:", status)
