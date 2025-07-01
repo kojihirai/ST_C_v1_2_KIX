@@ -3,6 +3,7 @@
 import ExperimentSelector from "@/components/control-system/experiment-selector"
 import ControlPanel from "@/components/control-system/control-panel"
 import { WebSocketStatusIndicator } from "@/components/control-system/websocket-status"
+import { DeviceStatusIndicator } from "@/components/control-system/device-status-indicator"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Activity, Settings } from "lucide-react"
@@ -47,7 +48,7 @@ export default function ControlSystemMinimal() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background p-3">
+    <div className="flex flex-col min-h-screen bg-background p-3 pb-16">
       <div className="container mx-auto">
         <div
           className={`mb-4 p-3 rounded-lg flex items-center justify-between ${
@@ -164,6 +165,8 @@ export default function ControlSystemMinimal() {
           selectedProject={projects.find(p => p.project_id === selectedProjectId)}
         />
       </div>
+      
+      <DeviceStatusIndicator />
     </div>
   )
 }
