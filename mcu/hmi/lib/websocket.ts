@@ -3,11 +3,6 @@
 
 export type WebSocketStatus = "connected" | "connecting" | "disconnected" | "error"
 
-interface WebSocketMessage {
-  type: string
-  data: Record<string, number | string>
-}
-
 type StatusChangeCallback = (status: WebSocketStatus) => void
 type MessageCallback = (data: Record<string, number | string>) => void
 
@@ -121,8 +116,16 @@ class WebSocketManager {
 
   private handleMessage(event: MessageEvent) {
     try {
-      const message = JSON.parse(event.data) as WebSocketMessage
-      this.notifyMessageHandlers(message.type, message.data)
+      const message = JSON.parse(event.data)
+      
+      // Handle different message formats
+      if (message.type && message.data) {
+        // New format with type and data
+        this.notifyMessageHandlers(message.type, message.data)
+      } else {
+        // Legacy format - treat as generic data
+        this.notifyMessageHandlers("data", message)
+      }
     } catch (error) {
       console.error("Failed to parse WebSocket message:", error)
     }

@@ -52,14 +52,11 @@ class SensorController:
             if self.ser.in_waiting > 0:
                 self.data_buffer += self.ser.read(self.ser.in_waiting)
             
-            # Process all complete packets in buffer
             while len(self.data_buffer) >= PACKET_SIZE:
-                # Look for sync byte at the end of a packet
                 if len(self.data_buffer) >= PACKET_SIZE and self.data_buffer[PACKET_SIZE - 1] == ord(SYNC_BYTE):
                     packet = self.data_buffer[:PACKET_SIZE]
                     self.data_buffer = self.data_buffer[PACKET_SIZE:]
                     
-                    # Unpack the 3 int16 values (6 bytes) + sync byte (1 byte)
                     raw_drill, raw_power, raw_linear = struct.unpack('<hhh', packet[:-1])
                     return {
                         "DRILL": float(raw_drill) / AMP_SCALE,
@@ -67,17 +64,13 @@ class SensorController:
                         "LINEAR": float(raw_linear) / AMP_SCALE
                     }
                 else:
-                    # Sync byte not found at expected position, advance buffer
                     sync_pos = self.data_buffer.find(SYNC_BYTE)
                     if sync_pos == -1:
-                        # No sync byte found, clear buffer
                         self.data_buffer = b''
                         break
                     else:
-                        # Advance to after the sync byte
                         self.data_buffer = self.data_buffer[sync_pos + 1:]
             
-            # Prevent buffer from growing too large
             if len(self.data_buffer) > PACKET_SIZE * 10:
                 self.data_buffer = self.data_buffer[-PACKET_SIZE:]
                 
@@ -92,7 +85,6 @@ class SensorController:
                 data = self.ser.read(PACKET_SIZE * BATCH_SIZE)
                 self.data_buffer += data
                 
-                # Process all complete packets
                 while len(self.data_buffer) >= PACKET_SIZE:
                     if self.data_buffer[PACKET_SIZE - 1] == ord(SYNC_BYTE):
                         packet = self.data_buffer[:PACKET_SIZE]
@@ -105,18 +97,15 @@ class SensorController:
                             "LINEAR": float(raw_linear) / AMP_SCALE
                         }
                     else:
-                        # Find next sync byte
                         sync_pos = self.data_buffer.find(SYNC_BYTE)
                         if sync_pos == -1:
                             self.data_buffer = b''
                             break
                         self.data_buffer = self.data_buffer[sync_pos + 1:]
                 
-                # Also check for any remaining data
                 if self.ser.in_waiting > 0:
                     self.data_buffer += self.ser.read(self.ser.in_waiting)
                     
-            # Prevent buffer overflow
             if len(self.data_buffer) > PACKET_SIZE * 20:
                 self.data_buffer = self.data_buffer[-PACKET_SIZE:]
                 
@@ -143,7 +132,6 @@ class SensorController:
         
         while self.running:
             try:
-                # Try batch reading first, then fallback to single packet
                 meas = self.read_sensors_batch()
                 if not meas:
                     meas = self.read_sensors()
@@ -160,14 +148,12 @@ class SensorController:
                         "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
                     }
                     
-                    # Publish immediately if we have data
                     self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
                     last_publish_time = current_time
                     
                 else:
                     consecutive_failures += 1
-                    # If we haven't published in a while, send a status update anyway
-                    if current_time - last_publish_time > 0.1:  # 100ms
+                    if current_time - last_publish_time > 0.1:
                         status = {
                             # "timestamp": current_time,
                             "DRILL_CURRENT": 0.0,
