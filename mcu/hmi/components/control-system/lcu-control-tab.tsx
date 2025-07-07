@@ -1,3 +1,4 @@
+import { ArrowUp, ArrowDown } from 'lucide-react'
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
@@ -72,19 +73,21 @@ export default function LcuControlTab({
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant={isReadOnly ? (projectDirectionEnum === LcuDirection.fw ? "default" : "outline") : (lcuDirection === LcuDirection.fw ? "default" : "outline")}
-            className="w-full"
-            disabled={isReadOnly}
             onClick={() => !isReadOnly && setLcuDirection(LcuDirection.fw)}
+            className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
+            disabled={isReadOnly}
           >
             Forward
+            <ArrowUp className="w-3 h-3" />
           </Button>
           <Button
             variant={isReadOnly ? (projectDirectionEnum === LcuDirection.bw ? "default" : "outline") : (lcuDirection === LcuDirection.bw ? "default" : "outline")}
-            className="w-full"
-            disabled={isReadOnly}
             onClick={() => !isReadOnly && setLcuDirection(LcuDirection.bw)}
+            className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
+            disabled={isReadOnly}
           >
             Backward
+            <ArrowDown className="w-3 h-3" />
           </Button>
         </div>
       </div>
