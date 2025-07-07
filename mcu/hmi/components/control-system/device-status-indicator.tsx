@@ -2,56 +2,92 @@
 
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Activity, AlertCircle, WifiOff } from "lucide-react"
+import { Activity, WifiOff, Clock } from "lucide-react"
 import { websocket } from "@/lib/websocket"
 
 interface DeviceStatus {
-  status: "connected" | "disconnected" | "error"
+  device: string
+  status: "online" | "warning" | "offline"
   last_seen: string | null
-  error: string | null
+  heartbeat_interval: number | null
+  data_count: number
 }
 
 interface DeviceStatusData {
-  devices: {
-    lcu: DeviceStatus
-    dcu: DeviceStatus
-    sdu: DeviceStatus
-  }
+  devices: DeviceStatus[]
   timestamp: string
 }
 
 export function DeviceStatusIndicator() {
-  const [deviceStatus, setDeviceStatus] = useState<DeviceStatusData["devices"]>({
-    lcu: { status: "disconnected", last_seen: null, error: null },
-    dcu: { status: "disconnected", last_seen: null, error: null },
-    sdu: { status: "disconnected", last_seen: null, error: null }
+  const [deviceStatus, setDeviceStatus] = useState<Record<string, DeviceStatus>>({
+    lcu: { device: "lcu", status: "offline", last_seen: null, heartbeat_interval: null, data_count: 0 },
+    dcu: { device: "dcu", status: "offline", last_seen: null, heartbeat_interval: null, data_count: 0 },
+    sdu: { device: "sdu", status: "offline", last_seen: null, heartbeat_interval: null, data_count: 0 }
   })
 
   useEffect(() => {
-    // Handle device status updates
-    const handleDeviceStatus = (data: Record<string, unknown>) => {
-      if (data.devices && data.timestamp) {
-        setDeviceStatus(data.devices as DeviceStatusData["devices"])
+    // Handle device status updates from the new monitoring system
+    const handleDeviceStatusUpdate = (data: Record<string, unknown>) => {
+      if (data.type === "device_status_update" && data.data) {
+        const statusData = data.data as DeviceStatusData
+        if (statusData.devices && Array.isArray(statusData.devices)) {
+          const newStatus: Record<string, DeviceStatus> = {}
+          statusData.devices.forEach((device: DeviceStatus) => {
+            newStatus[device.device] = device
+          })
+          setDeviceStatus(newStatus)
+        }
       }
     }
 
-    websocket.on("device_status", handleDeviceStatus)
+    // Handle legacy device status format (fallback)
+    const handleLegacyDeviceStatus = (data: Record<string, unknown>) => {
+      if (data.devices && data.timestamp) {
+        // Convert legacy format to new format
+        const legacyDevices = data.devices as Record<string, { status: string; last_seen: string | null }>
+        const newStatus: Record<string, DeviceStatus> = {}
+        
+        Object.entries(legacyDevices).forEach(([device, status]) => {
+          newStatus[device] = {
+            device,
+            status: status.status === "connected" ? "online" : 
+                   status.status === "error" ? "warning" : "offline",
+            last_seen: status.last_seen,
+            heartbeat_interval: null,
+            data_count: 0
+          }
+        })
+        setDeviceStatus(newStatus)
+      }
+    }
+
+    // Listen for the new device status update format
+    websocket.on("device_status_update", handleDeviceStatusUpdate)
+    
+    // Listen for legacy format as fallback
+    websocket.on("device_status", handleLegacyDeviceStatus)
 
     // Connect to WebSocket
     websocket.connect()
 
+    // Request initial status
+    setTimeout(() => {
+      websocket.send({ type: "request_status" })
+    }, 1000)
+
     return () => {
-      websocket.off("device_status", handleDeviceStatus)
+      websocket.off("device_status_update", handleDeviceStatusUpdate)
+      websocket.off("device_status", handleLegacyDeviceStatus)
     }
   }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "connected":
+      case "online":
         return "bg-green-500 hover:bg-green-600"
-      case "error":
-        return "bg-red-500 hover:bg-red-600"
-      case "disconnected":
+      case "warning":
+        return "bg-yellow-500 hover:bg-yellow-600"
+      case "offline":
       default:
         return "bg-gray-500 hover:bg-gray-600"
     }
@@ -59,11 +95,11 @@ export function DeviceStatusIndicator() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "connected":
+      case "online":
         return <Activity className="w-3 h-3" />
-      case "error":
-        return <AlertCircle className="w-3 h-3" />
-      case "disconnected":
+      case "warning":
+        return <Clock className="w-3 h-3" />
+      case "offline":
       default:
         return <WifiOff className="w-3 h-3" />
     }
@@ -86,8 +122,36 @@ export function DeviceStatusIndicator() {
     }
   }
 
+  const getStatusTooltip = (device: DeviceStatus) => {
+    const parts = []
+    
+    if (device.last_seen) {
+      parts.push(`Last seen: ${getLastSeenText(device.last_seen)}`)
+    }
+    
+    if (device.heartbeat_interval) {
+      parts.push(`Heartbeat: ${device.heartbeat_interval}s`)
+    }
+    
+    parts.push(`Data count: ${device.data_count}`)
+    
+    return parts.join(" | ")
+  }
+
+  const getOverallStatus = () => {
+    const statuses = Object.values(deviceStatus)
+    const onlineCount = statuses.filter(s => s.status === "online").length
+    const warningCount = statuses.filter(s => s.status === "warning").length
+    const offlineCount = statuses.filter(s => s.status === "offline").length
+    
+    if (onlineCount === statuses.length) return "All Online"
+    if (offlineCount === statuses.length) return "All Offline"
+    if (warningCount > 0) return `${warningCount} Warning${warningCount > 1 ? 's' : ''}`
+    return `${onlineCount}/${statuses.length} Online`
+  }
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 device-status-indicator border-t border-border p-2 z-50">
+    <div className="fixed bottom-0 left-0 right-0 device-status-indicator border-t border-border p-2 z-50 bg-background/95 backdrop-blur-sm">
       <div className="container mx-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -96,17 +160,20 @@ export function DeviceStatusIndicator() {
               <div key={device} className="flex items-center gap-2">
                 <Badge 
                   variant="secondary" 
-                  className={`device-status-badge ${status.status} ${getStatusColor(status.status)} text-white text-xs px-2 py-1 h-6 flex items-center gap-1`}
-                  title={status.error || `Last seen: ${getLastSeenText(status.last_seen)}`}
+                  className={`device-status-badge ${status.status} ${getStatusColor(status.status)} text-white text-xs px-2 py-1 h-6 flex items-center gap-1 transition-colors duration-200`}
+                  title={getStatusTooltip(status)}
                 >
                   {getStatusIcon(status.status)}
                   {device.toUpperCase()}
+                  {status.data_count > 0 && (
+                    <span className="ml-1 text-xs opacity-75">({status.data_count})</span>
+                  )}
                 </Badge>
               </div>
             ))}
           </div>
           <div className="text-xs text-muted-foreground">
-            Last Update: {deviceStatus.lcu.last_seen ? getLastSeenText(deviceStatus.lcu.last_seen) : "Never"}
+            {getOverallStatus()}
           </div>
         </div>
       </div>
