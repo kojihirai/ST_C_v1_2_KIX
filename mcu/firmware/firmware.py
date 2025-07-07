@@ -20,7 +20,6 @@ class DeviceStatus(BaseModel):
     device: str
     status: str  # "online", "offline", "warning"
     last_seen: Optional[datetime]
-    heartbeat_interval: Optional[int]  # seconds
     data_count: int
 
 
@@ -55,7 +54,6 @@ active_clients = []
 
 # Device monitoring state
 device_status = {}
-device_heartbeats = {}
 monitoring_task = None
 
 
@@ -68,43 +66,29 @@ def initialize_device_status():
             device=device,
             status="offline",
             last_seen=None,
-            heartbeat_interval=None,
             data_count=0
         )
-        device_heartbeats[device] = None
 
 def update_device_status(device: str, data: dict):
     """Update device status when data is received"""
-    print(f"🔄 Updating device status for: {device}")
-    print(f"🔄 Device data: {data}")
-    
     if device not in device_status:
-        print(f"❌ Device {device} not found in device_status")
         return
     
     current_time = datetime.now()
     device_status[device].last_seen = current_time
     device_status[device].data_count += 1
     
-    # Check if device has heartbeat information
-    if "heartbeat_interval" in data:
-        device_status[device].heartbeat_interval = data["heartbeat_interval"]
-    
     # Update status to online
     previous_status = device_status[device].status
     if device_status[device].status != "online":
         device_status[device].status = "online"
-        print(f"✅ Device {device} is now ONLINE")
+        print(f"Device {device} is now ONLINE")
     
-    # Update heartbeat timestamp
-    device_heartbeats[device] = current_time
+
     
     # Trigger immediate broadcast if status changed
     if previous_status != device_status[device].status:
-        print(f"📡 Broadcasting status change for {device}")
         asyncio.create_task(broadcast_device_status())
-    
-    print(f"📊 Current device status: {device_status[device].dict()}")
 
 def check_device_health():
     """Check if devices are still sending data within expected intervals"""
@@ -115,27 +99,27 @@ def check_device_health():
             continue
             
         status = device_status[device]
-        last_heartbeat = device_heartbeats.get(device)
+        last_seen = status.last_seen
         
-        if last_heartbeat is None:
+        if last_seen is None:
             continue
             
-        # Calculate expected heartbeat interval (default to 30 seconds if not specified)
-        expected_interval = status.heartbeat_interval or 30
+        # Calculate expected interval (default to 30 seconds)
+        expected_interval = 30
         warning_threshold = expected_interval * 1.5  # 50% grace period
         offline_threshold = expected_interval * 2    # 100% grace period
         
-        time_since_last = (current_time - last_heartbeat).total_seconds()
+        time_since_last = (current_time - last_seen).total_seconds()
         
         if time_since_last > offline_threshold:
             if status.status != "offline":
                 status.status = "offline"
-                print(f"❌ Device {device} is OFFLINE (no data for {time_since_last:.1f}s)")
+                print(f"Device {device} is OFFLINE (no data for {time_since_last:.1f}s)")
                 asyncio.create_task(broadcast_device_status())
         elif time_since_last > warning_threshold:
             if status.status != "warning":
                 status.status = "warning"
-                print(f"⚠️ Device {device} is WARNING (no data for {time_since_last:.1f}s)")
+                print(f"Device {device} is WARNING (no data for {time_since_last:.1f}s)")
                 asyncio.create_task(broadcast_device_status())
 
 async def monitoring_loop():
@@ -203,7 +187,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text(f"Server Response: {message}")
                 
     except WebSocketDisconnect:
-        print("⚠️ Client disconnected")
+        print("Client disconnected")
     finally:
         active_clients.remove(websocket)
 
@@ -216,35 +200,30 @@ mqtt_client = mqtt.Client()
 def on_mqtt_message(client, userdata, message):
     """Handle incoming MQTT messages"""
     try:
-        print(f"📨 MQTT message received on topic: {message.topic}")
-        print(f"📨 MQTT payload: {message.payload.decode()}")
+        print(f"MQTT message received on topic: {message.topic}")
         payload = json.loads(message.payload.decode())
         device = message.topic.split('/')[0]
-        print(f"🔍 Extracted device name: '{device}' from topic: '{message.topic}'")
-        print(f"🔍 Expected devices: {expected_devices}")
         if device in expected_devices:
             device_data[device] = payload
             # Update device status when data is received
             update_device_status(device, payload)
-            print(f"✅ Updated status for device: {device}")
+            print(f"Updated status for device: {device}")
         else:
-            print(f"⚠️ Unknown device in topic: {device}")
-            print(f"⚠️ Available device data keys: {list(device_data.keys())}")
+            print(f"Unknown device in topic: {device}")
     except Exception as e:
         print(f"Error processing MQTT message: {e}")
-        print(f"Error details: {type(e).__name__}: {str(e)}")
 
 def on_mqtt_connect(client, userdata, flags, rc):
     """Handle MQTT connection"""
     if rc == 0:
-        print("✅ Connected to MQTT broker")
+        print("Connected to MQTT broker")
         # Subscribe to all device topics
         for device in expected_devices:
             # Subscribe to any topic that starts with the device name
             client.subscribe(f"{device}/#")
-            print(f"📡 Subscribed to {device}/#")
+            print(f"Subscribed to {device}/#")
     else:
-        print(f"❌ Failed to connect to MQTT broker, return code: {rc}")
+        print(f"Failed to connect to MQTT broker, return code: {rc}")
 
 mqtt_client.on_message = on_mqtt_message
 mqtt_client.on_connect = on_mqtt_connect
@@ -298,18 +277,7 @@ async def get_device_health_summary():
         "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/debug/mqtt/")
-async def get_mqtt_debug_info():
-    """Get debug information about MQTT connection and data"""
-    return {
-        "mqtt_connected": mqtt_client.is_connected(),
-        "expected_devices": expected_devices,
-        "device_data": device_data,
-        "device_status": {device: status.dict() for device, status in device_status.items()},
-        "device_heartbeats": {device: str(heartbeat) if heartbeat else None for device, heartbeat in device_heartbeats.items()},
-        "active_clients_count": len(active_clients),
-        "timestamp": datetime.now().isoformat()
-    }
+
 
 # --- WebSocket Updates for Device Status ---
 
@@ -348,7 +316,7 @@ async def startup():
     global monitoring_task
     initialize_device_status()
     monitoring_task = asyncio.create_task(monitoring_loop())
-    print("🚀 Device monitoring started")
+    print("Device monitoring started")
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -359,7 +327,7 @@ async def shutdown():
             await monitoring_task
         except asyncio.CancelledError:
             pass
-    print("🛑 Device monitoring stopped")
+    print("Device monitoring stopped")
 
 def signal_handler(sig, frame):
     print("\nKeyboard Interrupt detected! Shutting down gracefully...")
