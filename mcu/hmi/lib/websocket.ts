@@ -35,7 +35,7 @@ class WebSocketManager {
       return
     }
 
-    console.log(`🔌 Attempting to connect to WebSocket: ${this.url}`)
+    console.log(`Attempting to connect to WebSocket: ${this.url}`)
     this.setStatus("connecting")
 
     try {
@@ -111,19 +111,19 @@ class WebSocketManager {
   }
 
   private handleOpen() {
-    console.log("✅ WebSocket connected successfully")
+    console.log("WebSocket connected successfully")
     this.status = "connected"
     this.notifyStatusChange()
   }
 
   private handleClose() {
-    console.log("❌ WebSocket connection closed")
+    console.log("WebSocket connection closed")
     this.status = "disconnected"
     this.notifyStatusChange()
   }
 
   private handleError() {
-    console.error("🚨 WebSocket connection error")
+    console.error("WebSocket connection error")
     this.status = "error"
     this.notifyStatusChange()
   }
