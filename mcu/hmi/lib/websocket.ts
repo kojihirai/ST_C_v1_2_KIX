@@ -93,6 +93,16 @@ class WebSocketManager {
     return this.status
   }
 
+  // Send a message to the WebSocket server
+  send(message: string | object): void {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      const messageStr = typeof message === 'string' ? message : JSON.stringify(message)
+      this.socket.send(messageStr)
+    } else {
+      console.warn("WebSocket is not connected, cannot send message")
+    }
+  }
+
   // Private methods
   private setStatus(status: WebSocketStatus): void {
     this.status = status
