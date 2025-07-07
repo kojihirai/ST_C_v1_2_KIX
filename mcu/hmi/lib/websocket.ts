@@ -167,9 +167,13 @@ class WebSocketManager {
   }
 }
 
+// Dynamic WebSocket URL logic matching API client
+const WS_BASE_URL = typeof window !== 'undefined' 
+  ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/ws`
+  : 'ws://localhost:8000/ws';
+
 // Create and export a singleton instance
 export const websocket = new WebSocketManager({
-  url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8000/ws",
-  // url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://10.147.18.184:8000/ws",
+  url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || WS_BASE_URL,
   reconnectInterval: 3000,
 })
