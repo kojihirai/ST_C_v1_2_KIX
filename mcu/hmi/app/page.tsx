@@ -7,12 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Activity } from "lucide-react"
 import { useControlSystem } from "@/hooks/useControlSystem"
-import { LcuCommand, DcuCommand } from "@/lib/constants"
 
 export default function ControlSystemMinimal() {
   const {
-    mode,
-    setMode,
     systemStatus,
     lcuDirection,
     setLcuDirection,
@@ -27,14 +24,7 @@ export default function ControlSystemMinimal() {
     executeCommand
   } = useControlSystem()
 
-  const handleReset = async () => {
-    try {
-      // Send homing command to LCU
-      await executeCommand("lcu", LcuCommand.homing, {});
-    } catch (error) {
-      console.error('Error sending homing command:', error);
-    }
-  };
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background p-3 pb-16">

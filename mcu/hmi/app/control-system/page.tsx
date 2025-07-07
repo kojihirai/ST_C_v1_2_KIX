@@ -1,7 +1,6 @@
 "use client"
 
 import React, { useState } from 'react'
-import { Card } from "@/components/ui/card"
 import ControlPanel from '@/components/control-system/control-panel'
 import { WebSocketStatusIndicator } from '@/components/control-system/websocket-status'
 import { LcuDirection, DcuDirection, LcuCommand, DcuCommand } from "@/lib/constants"

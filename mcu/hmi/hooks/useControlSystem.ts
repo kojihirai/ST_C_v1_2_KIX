@@ -19,23 +19,13 @@ export function useControlSystem() {
 
   // Helper functions for value conversion and validation
   const validateLcuTarget = (value: number, mode: string) => {
-    if (mode === "pid_speed") {
-      // For PID speed mode, value is in mm/s
-      return Math.max(0, value)
-    } else {
-      // For other modes, value is duty cycle percentage (0-100)
-      return Math.min(Math.max(value, 0), 100)
-    }
+    // For run_cont mode, value is duty cycle percentage (0-100)
+    return Math.min(Math.max(value, 0), 100)
   }
 
   const validateDcuTarget = (value: number, mode: string) => {
-    if (mode === "pid_speed") {
-      // For PID speed mode, value is in RPM
-      return Math.max(0, value)
-    } else {
-      // For other modes, value is voltage (0-24V)
-      return Math.min(Math.max(value, 0), 24)
-    }
+    // For run_cont mode, value is voltage (0-24V)
+    return Math.min(Math.max(value, 0), 24)
   }
 
   // Update target setters to use validation
@@ -134,7 +124,7 @@ export function useControlSystem() {
       
       // Send both LCU and DCU commands when starting
       console.log("Sending LCU command...")
-      await sendCommand("lcu", LcuCommand.pid_speed, { target: lcuTarget, direction: lcuDirection });
+      await sendCommand("lcu", LcuCommand.run_cont, { target: lcuTarget, direction: lcuDirection });
       console.log("Sending DCU command...")
       await sendCommand("dcu", DcuCommand.run_cont, { target: dcuTarget, direction: dcuDirection });
       
