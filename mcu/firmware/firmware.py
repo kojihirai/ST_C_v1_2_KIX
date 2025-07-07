@@ -75,7 +75,11 @@ def initialize_device_status():
 
 def update_device_status(device: str, data: dict):
     """Update device status when data is received"""
+    print(f"🔄 Updating device status for: {device}")
+    print(f"🔄 Device data: {data}")
+    
     if device not in device_status:
+        print(f"❌ Device {device} not found in device_status")
         return
     
     current_time = datetime.now()
@@ -97,7 +101,10 @@ def update_device_status(device: str, data: dict):
     
     # Trigger immediate broadcast if status changed
     if previous_status != device_status[device].status:
+        print(f"📡 Broadcasting status change for {device}")
         asyncio.create_task(broadcast_device_status())
+    
+    print(f"📊 Current device status: {device_status[device].dict()}")
 
 def check_device_health():
     """Check if devices are still sending data within expected intervals"""
@@ -209,16 +216,38 @@ mqtt_client = mqtt.Client()
 def on_mqtt_message(client, userdata, message):
     """Handle incoming MQTT messages"""
     try:
+        print(f"📨 MQTT message received on topic: {message.topic}")
+        print(f"📨 MQTT payload: {message.payload.decode()}")
         payload = json.loads(message.payload.decode())
         device = message.topic.split('/')[0]
+        print(f"🔍 Extracted device name: '{device}' from topic: '{message.topic}'")
+        print(f"🔍 Expected devices: {expected_devices}")
         if device in expected_devices:
             device_data[device] = payload
             # Update device status when data is received
             update_device_status(device, payload)
+            print(f"✅ Updated status for device: {device}")
+        else:
+            print(f"⚠️ Unknown device in topic: {device}")
+            print(f"⚠️ Available device data keys: {list(device_data.keys())}")
     except Exception as e:
         print(f"Error processing MQTT message: {e}")
+        print(f"Error details: {type(e).__name__}: {str(e)}")
+
+def on_mqtt_connect(client, userdata, flags, rc):
+    """Handle MQTT connection"""
+    if rc == 0:
+        print("✅ Connected to MQTT broker")
+        # Subscribe to all device topics
+        for device in expected_devices:
+            # Subscribe to any topic that starts with the device name
+            client.subscribe(f"{device}/#")
+            print(f"📡 Subscribed to {device}/#")
+    else:
+        print(f"❌ Failed to connect to MQTT broker, return code: {rc}")
 
 mqtt_client.on_message = on_mqtt_message
+mqtt_client.on_connect = on_mqtt_connect
 mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
 mqtt_client.loop_start()
 
@@ -266,6 +295,19 @@ async def get_device_health_summary():
             "offline": offline_count
         },
         "devices": {device: status.dict() for device, status in device_status.items()},
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/debug/mqtt/")
+async def get_mqtt_debug_info():
+    """Get debug information about MQTT connection and data"""
+    return {
+        "mqtt_connected": mqtt_client.is_connected(),
+        "expected_devices": expected_devices,
+        "device_data": device_data,
+        "device_status": {device: status.dict() for device, status in device_status.items()},
+        "device_heartbeats": {device: str(heartbeat) if heartbeat else None for device, heartbeat in device_heartbeats.items()},
+        "active_clients_count": len(active_clients),
         "timestamp": datetime.now().isoformat()
     }
 
