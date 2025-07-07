@@ -74,7 +74,10 @@ export const sendCommand = async (data: {
   }
 };
 
-// Default export
-export default {
+// Create API client object
+const apiClient = {
   sendCommand
 };
+
+// Default export
+export default apiClient;
