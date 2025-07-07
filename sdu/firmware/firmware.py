@@ -29,10 +29,6 @@ class SensorController:
         self.client.subscribe(f"{DEVICE_ID}/cmd")
         self.client.on_message = self.on_message
 
-        self.project_id = 0
-        self.experiment_id = 0
-        self.run_id = 0
-
         self.ser = serial.Serial(
             port=SERIAL_PORT,
             baudrate=BAUD_RATE,
@@ -116,14 +112,8 @@ class SensorController:
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
-            self.project_id = int(data.get("project_id", 0))
-            self.experiment_id = int(data.get("experiment_id", 0))
-            self.run_id = int(data.get("run_id", 0))
         except (json.JSONDecodeError, ValueError, TypeError) as e:
             self.send_error(f"MQTT command error: {e}")
-            self.project_id = 0
-            self.experiment_id = 0
-            self.run_id = 0
 
     def publish_status(self):
         last_publish_time = time.time()
@@ -141,11 +131,9 @@ class SensorController:
                 if meas:
                     consecutive_failures = 0
                     status = {
-                        # "timestamp": current_time,
                         "DRILL_CURRENT": float(meas["DRILL"]),
                         "POWER_CURRENT": float(meas["POWER"]),
                         "LINEAR_CURRENT": float(meas["LINEAR"]),
-                        "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
                     }
                     
                     self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
@@ -155,11 +143,9 @@ class SensorController:
                     consecutive_failures += 1
                     if current_time - last_publish_time > 0.1:
                         status = {
-                            # "timestamp": current_time,
                             "DRILL_CURRENT": 0.0,
                             "POWER_CURRENT": 0.0,
                             "LINEAR_CURRENT": 0.0,
-                            "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
                         }
                         self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
                         last_publish_time = current_time
