@@ -110,10 +110,6 @@ class MotorController:
         self.rpm_value = 0.0
         self.rpm_offset = 0.0
 
-        self.project_id = 0
-        self.experiment_id = 0
-        self.run_id = 0
-
         self.pi = pigpio.pi()
         for pin in [MOTOR1_PINS["RPWM"], MOTOR1_PINS["LPWM"], MOTOR1_PINS["REN"], MOTOR1_PINS["LEN"]]:
             self.pi.set_mode(pin, pigpio.OUTPUT)
@@ -156,9 +152,7 @@ class MotorController:
             self.mode = Mode(data.get("mode", 0))
             self.direction = Direction(data.get("direction", 0))
             self.target = data.get("target", 50)
-            self.project_id = data.get("project_id", 0)
-            self.experiment_id = data.get("experiment_id", 0)
-            self.run_id = data.get("run_id", 0)
+
             print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}, Speed={self.target}")
         except Exception as e:
             self.send_error(f"MQTT command error: {e}")
@@ -206,19 +200,14 @@ class MotorController:
 
     def publish_status(self):
         while self.running:
-            #                "timestamp": time.monotonic(),
             status = {
-
                 "mode": self.mode.value,
                 "direction": self.direction.value,
                 "target": self.target,
                 "rpm": round(self.rpm_value, 1),
                 "torque": round(self.torque_value, 2),
-                "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
             }
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(status))
-            # print("Status:", status)
-            # print(f"Torque: {self.torque_value}, RPM: {self.rpm_value}")
             time.sleep(0.2)
 
     def send_error(self, msg):

@@ -9,7 +9,6 @@ from queue import Queue
 import paho.mqtt.client as mqtt
 import pigpio
 
-
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
 
@@ -103,55 +102,6 @@ class LoadCellDriver:
         except Exception as e:
             print(f"Unexpected error at {hex(address)}: {e}")
         return False
-
-
-# ----------------------------------------------------
-# HighSpeedLogger Class
-# ----------------------------------------------------
-# class HighSpeedLogger:
-#     def __init__(self, filename="lcu_highspeed_log.csv"):
-#         self.filename = filename
-#         self.file = open(self.filename, mode='w', newline='', buffering=1)
-#         self.csv_writer = csv.writer(self.file)
-#         self.csv_writer.writerow([
-#             "timestamp", "pos_ticks", "pos_mm", "pos_inches",
-#             "current", "load", "current_speed"
-#         ])
-#         self.queue = Queue(maxsize=100000)
-#         self.running = True
-#         self.thread = threading.Thread(target=self._run, daemon=True)
-#         self.thread.start()
-
-#     def log(self, data: dict):
-#         if not self.running:
-#             return
-#         try:
-#             self.queue.put_nowait(data)
-#         except:
-#             pass
-
-#     def _run(self):
-#         while self.running:
-#             record = self.queue.get()
-#             if record is None:
-#                 break
-#             row = [
-#                 record.get("timestamp", time.monotonic()),
-#                 record.get("pos_ticks", 0),
-#                 record.get("pos_mm", 0.0),
-#                 record.get("pos_inches", 0.0),
-#                 record.get("current", 0.0),
-#                 record.get("load", 0.0),
-#                 record.get("current_speed", 0.0)
-#             ]
-#             self.csv_writer.writerow(row)
-
-#     def stop(self):
-#         self.running = False
-#         self.queue.put(None)
-#         self.thread.join()
-#         self.file.close()
-
 
 # ----------------------------------------------------
 # PIDController, Enums, Constants (unchanged)
@@ -329,7 +279,6 @@ class MotorSystem:
                     print("System not homed - initiating homing sequence")
                     self.mode = Mode.HOMING
                     return
-                
                 if 'mode' in data:
                     self.mode = Mode(data['mode'])
                 if 'direction' in data:
@@ -427,17 +376,12 @@ class MotorSystem:
                 pass
 
             data = {
-                #"timestamp": time.monotonic(),
                 "pos_ticks": pos_ticks,
                 "pos_mm": round(pos_mm, 3),
-                # "pos_inches": round(pos_in, 3),
-                # "current": 0.0,
                 "load": load_val,
                 "current_speed": round(self.current_speed, 3),
-                "PER_id": f"{self.project_id}_{self.experiment_id}_{self.run_id}"
             }
 
-            # self.logger.log(data)
             self.client.publish(f"{DEVICE_ID}/data", json.dumps(data))
             time.sleep(0.2)
 

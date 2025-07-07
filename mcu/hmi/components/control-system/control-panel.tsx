@@ -6,7 +6,6 @@ import { Square, Play } from 'lucide-react'
 import LcuControlTab from "./lcu-control-tab"
 import DcuControlTab from "./dcu-control-tab"
 import { LcuDirection, DcuDirection, LcuCommand, DcuCommand } from "@/lib/constants"
-import { Project } from "@/lib/api-client"
 import React from "react"
 
 interface ControlPanelProps {
@@ -20,8 +19,6 @@ interface ControlPanelProps {
   setDcuTarget: (target: number) => void
   executeCommand: (unit: "lcu" | "dcu", command: LcuCommand | DcuCommand, params: Record<string, number | string>) => void
   executeOnChange?: boolean
-  mode: "manual" | "experiment" | "program"
-  selectedProject?: Project | null
 }
 
 export default function ControlPanel({
@@ -34,9 +31,7 @@ export default function ControlPanel({
   dcuTarget,
   setDcuTarget,
   executeCommand,
-  executeOnChange = false,
-  mode,
-  selectedProject
+  executeOnChange = false
 }: ControlPanelProps) {
   // Track last sent command values
   const [lastLcuCommand, setLastLcuCommand] = React.useState<{direction: LcuDirection, target: number} | null>(null);
@@ -105,12 +100,6 @@ export default function ControlPanel({
     }
   }
 
-  // Get project control values if in experiment mode
-  const projectControls = mode === "experiment" && selectedProject?.project_controls ? {
-    lcu: selectedProject.project_controls.linearActuator,
-    dcu: selectedProject.project_controls.drill
-  } : null
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* LCU Controls */}
@@ -132,16 +121,11 @@ export default function ControlPanel({
           <LcuControlTab
             lcuDirection={lcuDirection}
             setLcuDirection={setLcuDirection}
-            lcuTarget={mode === "experiment" && projectControls?.lcu && typeof projectControls.lcu === 'object' && 'setpoint' in projectControls.lcu 
-              ? Number(projectControls.lcu.setpoint) 
-              : lcuTarget}
+            lcuTarget={lcuTarget}
             setLcuTarget={setLcuTarget}
             executeLcuCommand={executeLcuCommand}
-            executeOnChange={executeOnChange && mode === "manual"}
-            isReadOnly={mode === "experiment"}
-            projectDirection={mode === "experiment" && projectControls?.lcu && typeof projectControls.lcu === 'object' && 'direction' in projectControls.lcu 
-              ? projectControls.lcu.direction as string 
-              : undefined}
+            executeOnChange={executeOnChange}
+            isReadOnly={false}
           />
         </CardContent>
       </Card>
@@ -165,16 +149,11 @@ export default function ControlPanel({
           <DcuControlTab
             dcuDirection={dcuDirection}
             setDcuDirection={setDcuDirection}
-            dcuTarget={mode === "experiment" && projectControls?.dcu && typeof projectControls.dcu === 'object' && 'setpoint' in projectControls.dcu 
-              ? Number(projectControls.dcu.setpoint) 
-              : dcuTarget}
+            dcuTarget={dcuTarget}
             setDcuTarget={setDcuTarget}
             executeDcuCommand={executeDcuCommand}
-            executeOnChange={executeOnChange && mode === "manual"}
-            isReadOnly={mode === "experiment"}
-            projectDirection={mode === "experiment" && projectControls?.dcu && typeof projectControls.dcu === 'object' && 'direction' in projectControls.dcu 
-              ? projectControls.dcu.direction as DcuDirection 
-              : undefined}
+            executeOnChange={executeOnChange}
+            isReadOnly={false}
           />
         </CardContent>
       </Card>
