@@ -9,7 +9,6 @@ interface DeviceStatus {
   device: string
   status: "online" | "warning" | "offline"
   last_seen: string | null
-  heartbeat_interval: number | null
   data_count: number
 }
 
@@ -20,9 +19,9 @@ interface DeviceStatusData {
 
 export function DeviceStatusIndicator() {
   const [deviceStatus, setDeviceStatus] = useState<Record<string, DeviceStatus>>({
-    lcu: { device: "lcu", status: "offline", last_seen: null, heartbeat_interval: null, data_count: 0 },
-    dcu: { device: "dcu", status: "offline", last_seen: null, heartbeat_interval: null, data_count: 0 },
-    sdu: { device: "sdu", status: "offline", last_seen: null, heartbeat_interval: null, data_count: 0 }
+    lcu: { device: "lcu", status: "offline", last_seen: null, data_count: 0 },
+    dcu: { device: "dcu", status: "offline", last_seen: null, data_count: 0 },
+    sdu: { device: "sdu", status: "offline", last_seen: null, data_count: 0 }
   })
 
   useEffect(() => {
@@ -53,7 +52,6 @@ export function DeviceStatusIndicator() {
             status: status.status === "connected" ? "online" : 
                    status.status === "error" ? "warning" : "offline",
             last_seen: status.last_seen,
-            heartbeat_interval: null,
             data_count: 0
           }
         })
@@ -127,10 +125,6 @@ export function DeviceStatusIndicator() {
     
     if (device.last_seen) {
       parts.push(`Last seen: ${getLastSeenText(device.last_seen)}`)
-    }
-    
-    if (device.heartbeat_interval) {
-      parts.push(`Heartbeat: ${device.heartbeat_interval}s`)
     }
     
     parts.push(`Data count: ${device.data_count}`)
