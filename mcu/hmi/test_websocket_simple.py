@@ -26,6 +26,9 @@ async def test_websocket():
             except asyncio.TimeoutError:
                 print("No response received within 5 seconds")
                 
+    except websockets.exceptions.InvalidStatus as e:
+        print(f"ERROR: Server rejected WebSocket connection: {e}")
+        print("This usually means the WebSocket endpoint /ws is not available")
     except websockets.exceptions.ConnectionRefused:
         print("ERROR: Connection refused - server not accepting WebSocket connections")
     except websockets.exceptions.InvalidURI:
