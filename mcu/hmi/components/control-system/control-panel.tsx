@@ -36,8 +36,10 @@ export default function ControlPanel({
   // Track last sent command values
   const [lastLcuCommand, setLastLcuCommand] = React.useState<{direction: LcuDirection, target: number} | null>(null);
   const [lastDcuCommand, setLastDcuCommand] = React.useState<{direction: DcuDirection, target: number} | null>(null);
+  const [lcuStatus, setLcuStatus] = React.useState<string>("");
+  const [dcuStatus, setDcuStatus] = React.useState<string>("");
 
-  const executeLcuCommand = () => {
+  const executeLcuCommand = async () => {
     // Only send command if values have changed
     if (lastLcuCommand?.direction === lcuDirection && lastLcuCommand?.target === lcuTarget) {
       return;
@@ -55,11 +57,22 @@ export default function ControlPanel({
     }
 
     console.log(`Sending LCU command: ${command} with params:`, params)
-    executeCommand("lcu", command, params)
-    setLastLcuCommand({ direction: lcuDirection, target: lcuTarget })
+    setLcuStatus("Sending...")
+    
+    try {
+      await executeCommand("lcu", command, params)
+      setLcuStatus("Sent")
+      setLastLcuCommand({ direction: lcuDirection, target: lcuTarget })
+      
+      // Clear status after 2 seconds
+      setTimeout(() => setLcuStatus(""), 2000)
+    } catch (error) {
+      setLcuStatus("Failed")
+      console.error("LCU command failed:", error)
+    }
   }
 
-  const executeDcuCommand = () => {
+  const executeDcuCommand = async () => {
     // Only send command if values have changed
     if (lastDcuCommand?.direction === dcuDirection && lastDcuCommand?.target === dcuTarget) {
       return;
@@ -76,27 +89,73 @@ export default function ControlPanel({
       command = DcuCommand.idle
     }
 
-    executeCommand("dcu", command, params)
-    setLastDcuCommand({ direction: dcuDirection, target: dcuTarget })
-  }
-
-  const stopLcu = () => {
-    executeCommand("lcu", LcuCommand.idle, {})
-  }
-
-  const stopDcu = () => {
-    executeCommand("dcu", DcuCommand.idle, {})
-  }
-
-  const resumeLcu = () => {
-    if (lastLcuCommand) {
-      executeCommand("lcu", LcuCommand.run_cont, { target: lastLcuCommand.target, direction: lastLcuCommand.direction })
+    console.log(`Sending DCU command: ${command} with params:`, params)
+    setDcuStatus("Sending...")
+    
+    try {
+      await executeCommand("dcu", command, params)
+      setDcuStatus("Sent")
+      setLastDcuCommand({ direction: dcuDirection, target: dcuTarget })
+      
+      // Clear status after 2 seconds
+      setTimeout(() => setDcuStatus(""), 2000)
+    } catch (error) {
+      setDcuStatus("Failed")
+      console.error("DCU command failed:", error)
     }
   }
 
-  const resumeDcu = () => {
+  const stopLcu = async () => {
+    setLcuStatus("Stopping...")
+    try {
+      await executeCommand("lcu", LcuCommand.idle, {})
+      setLcuStatus("Stopped")
+      setLastLcuCommand(null)
+      setTimeout(() => setLcuStatus(""), 2000)
+    } catch (error) {
+      setLcuStatus("Stop failed")
+      console.error("LCU stop failed:", error)
+    }
+  }
+
+  const stopDcu = async () => {
+    setDcuStatus("Stopping...")
+    try {
+      await executeCommand("dcu", DcuCommand.idle, {})
+      setDcuStatus("Stopped")
+      setLastDcuCommand(null)
+      setTimeout(() => setDcuStatus(""), 2000)
+    } catch (error) {
+      setDcuStatus("Stop failed")
+      console.error("DCU stop failed:", error)
+    }
+  }
+
+  const resumeLcu = async () => {
+    if (lastLcuCommand) {
+      setLcuStatus("Resuming...")
+      try {
+        await executeCommand("lcu", LcuCommand.run_cont, { target: lastLcuCommand.target, direction: lastLcuCommand.direction })
+        setLcuStatus("Resumed")
+        setTimeout(() => setLcuStatus(""), 2000)
+      } catch (error) {
+        setLcuStatus("Resume failed")
+        console.error("LCU resume failed:", error)
+      }
+    }
+  }
+
+  const resumeDcu = async () => {
     if (lastDcuCommand) {
-      executeCommand("dcu", DcuCommand.run_cont, { target: lastDcuCommand.target, direction: lastDcuCommand.direction })
+      setDcuStatus("Resuming...")
+      try {
+        await executeCommand("dcu", DcuCommand.run_cont, { target: lastDcuCommand.target, direction: lastDcuCommand.direction })
+        setDcuStatus("Resumed")
+        setTimeout(() => setDcuStatus(""), 2000)
+      } catch (error) {
+        setDcuStatus("Resume failed")
+        console.error("DCU resume failed:", error)
+      }
     }
   }
 
@@ -106,7 +165,8 @@ export default function ControlPanel({
       <Card className="shadow-sm">
         <CardHeader className="py-2 px-3 flex flex-row justify-between items-center">
           <CardTitle className="text-sm">Linear Actuator Controls</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {lcuStatus && <span className="text-xs text-gray-600">{lcuStatus}</span>}
             <Button variant="outline" className="h-8 px-2 text-xs" onClick={resumeLcu} disabled={!lastLcuCommand}>
               <Play className="w-3 h-3 mr-1" />
               Resume
@@ -134,7 +194,8 @@ export default function ControlPanel({
       <Card className="shadow-sm">
         <CardHeader className="py-2 px-3 flex flex-row justify-between items-center">
           <CardTitle className="text-sm">Drill Controls</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {dcuStatus && <span className="text-xs text-gray-600">{dcuStatus}</span>}
             <Button variant="outline" className="h-8 px-2 text-xs" onClick={resumeDcu} disabled={!lastDcuCommand}>
               <Play className="w-3 h-3 mr-1" />
               Resume

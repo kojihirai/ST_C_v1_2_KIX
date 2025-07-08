@@ -106,31 +106,39 @@ class WebSocketManager {
 
   // Private methods
   private setStatus(status: WebSocketStatus): void {
-    this.status = status
-    this.statusChangeCallbacks.forEach((callback) => callback(status))
+    if (this.status !== status) {
+      console.log(`WebSocket status changed: ${this.status} → ${status}`)
+      this.status = status
+      this.statusChangeCallbacks.forEach((callback) => callback(status))
+    }
   }
 
   private handleOpen() {
     console.log("WebSocket connected successfully")
-    this.status = "connected"
-    this.notifyStatusChange()
+    this.reconnectAttempts = 0 // Reset reconnect attempts on successful connection
+    this.setStatus("connected")
   }
 
-  private handleClose() {
-    console.log("WebSocket connection closed")
-    this.status = "disconnected"
-    this.notifyStatusChange()
+  private handleClose(event: CloseEvent) {
+    console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`)
+    this.setStatus("disconnected")
+    
+    // Attempt to reconnect unless it was a clean close
+    if (event.code !== 1000) {
+      this.attemptReconnect()
+    }
   }
 
-  private handleError() {
-    console.error("WebSocket connection error")
-    this.status = "error"
-    this.notifyStatusChange()
+  private handleError(error: Event) {
+    console.error("WebSocket connection error:", error)
+    this.setStatus("error")
+    this.attemptReconnect()
   }
 
   private handleMessage(event: MessageEvent) {
     try {
       const message = JSON.parse(event.data)
+      console.log("WebSocket message received:", message)
       
       // Handle different message formats
       if (message.type && message.data) {
@@ -141,7 +149,7 @@ class WebSocketManager {
         this.notifyMessageHandlers("data", message)
       }
     } catch (error) {
-      console.error("Failed to parse WebSocket message:", error)
+      console.error("Failed to parse WebSocket message:", error, "Raw data:", event.data)
     }
   }
 
@@ -152,13 +160,20 @@ class WebSocketManager {
   private notifyMessageHandlers(type: string, data: Record<string, number | string>) {
     const handlers = this.messageHandlers.get(type)
     if (handlers) {
-      handlers.forEach(handler => handler(data))
+      handlers.forEach(handler => {
+        try {
+          handler(data)
+        } catch (error) {
+          console.error(`Error in message handler for type '${type}':`, error)
+        }
+      })
     }
   }
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log("Max reconnect attempts reached")
+      console.log(`Max reconnect attempts (${this.maxReconnectAttempts}) reached`)
+      this.setStatus("error")
       return
     }
 
@@ -171,13 +186,28 @@ class WebSocketManager {
   }
 }
 
-// Dynamic WebSocket URL logic matching API client
-const WS_BASE_URL = typeof window !== 'undefined' 
-  ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8000/ws`
-  : 'ws://localhost:8000/ws';
+// Dynamic WebSocket URL logic
+const getWebSocketUrl = (): string => {
+  // Check for environment variable first
+  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_WEBSOCKET_URL) {
+    return process.env.NEXT_PUBLIC_WEBSOCKET_URL
+  }
+  
+  // Fallback to dynamic URL based on current location
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const hostname = window.location.hostname
+    const port = '8000' // API server port
+    return `${protocol}//${hostname}:${port}/ws`
+  }
+  
+  // Server-side fallback
+  return 'ws://localhost:8000/ws'
+}
 
 // Create and export a singleton instance
 export const websocket = new WebSocketManager({
-  url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || WS_BASE_URL,
+  url: getWebSocketUrl(),
   reconnectInterval: 3000,
+  maxReconnectAttempts: 10,
 })

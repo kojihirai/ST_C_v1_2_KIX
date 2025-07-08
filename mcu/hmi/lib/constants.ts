@@ -1,7 +1,7 @@
 export enum LcuCommand {
   idle = 0,
   run_cont = 2,
-  homing = 7,
+  homing = 8,
 }
 
 export enum DcuCommand {
@@ -11,14 +11,14 @@ export enum DcuCommand {
 
 export enum LcuDirection {
   idle = 0,
-  fw = 1,
-  bw = 2,
+  bw = 1,  // Backward
+  fw = 2,  // Forward
 }
 
 export enum DcuDirection {
   idle = 0,
-  cw = 1,
-  ccw = 2,
+  ccw = 1,  // Counter-clockwise
+  cw = 2,   // Clockwise
 }
 
 export type SystemMode = "manual"
