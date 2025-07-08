@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Simple WebSocket test for 10.147.18.68:8000/ws
+Simple WebSocket test for 192.168.2.1:8000/ws
 """
 import asyncio
 import websockets
 import json
 
 async def test_websocket():
-    uri = "ws://10.147.18.68:8000/ws"
+    uri = "ws://192.168.2.1:8000/ws"
     
     try:
         print(f"Connecting to: {uri}")
@@ -26,6 +26,9 @@ async def test_websocket():
             except asyncio.TimeoutError:
                 print("No response received within 5 seconds")
                 
+    except websockets.exceptions.InvalidStatus as e:
+        print(f"ERROR: Server rejected WebSocket connection: {e}")
+        print("This usually means the WebSocket endpoint /ws is not available")
     except websockets.exceptions.ConnectionRefused:
         print("ERROR: Connection refused - server not accepting WebSocket connections")
     except websockets.exceptions.InvalidURI:
