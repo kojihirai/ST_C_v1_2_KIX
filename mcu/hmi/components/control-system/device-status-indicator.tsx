@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Activity, WifiOff, Clock } from "lucide-react"
-import { websocket } from "@/lib/websocket"
+import { websocket } from "@/lib/polling-manager"
 
 interface DeviceStatus {
   device: string
