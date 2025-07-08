@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { websocket } from "@/lib/websocket"
+import { websocket } from "@/lib/polling-manager"
 import { SystemMode, SystemStatus, LcuDirection, DcuDirection, LcuCommand, DcuCommand } from "@/lib/constants"
 import apiClient from "@/lib/api-client"
 
@@ -42,28 +42,19 @@ export function useControlSystem() {
       setWsConnected(status === "connected")
     })
 
-    websocket.on("all", (data) => {
-      console.log("Received WebSocket data:", data)
+    // Handle device status updates from polling
+    websocket.on("device_status_update", (data) => {
+      console.log("Received device status update:", data)
+      // Note: With polling, we only get overall device status, not individual device data
+      // The system status will be managed by the start/stop commands instead
     })
 
-    websocket.on("lcu_status", (lcuData) => {
-      if (lcuData.mode) setLcuMode(String(lcuData.mode))
-      if (lcuData.direction && lcuData.direction !== "idle") setLcuDirection(lcuData.direction as LcuDirection)
-      if (mode === "manual") setManualStatus(lcuData.mode !== "idle" ? "running" : "stopped")
-    })
-
-    websocket.on("dcu_status", (dcuData) => {
-      if (dcuData.mode) setDcuMode(String(dcuData.mode))
-      if (dcuData.direction && dcuData.direction !== "idle") setDcuDirection(dcuData.direction as DcuDirection)
-      if (mode === "manual" && manualStatus === "stopped") {
-        setManualStatus(dcuData.mode !== "idle" ? "running" : "stopped")
-      }
-    })
+    // Connect to start polling
+    websocket.connect()
 
     return () => {
-      websocket.off("all", () => {})
-      websocket.off("lcu_status", () => {})
-      websocket.off("dcu_status", () => {})
+      websocket.off("device_status_update", () => {})
+      websocket.disconnect()
     }
   }, [mode, manualStatus])
 

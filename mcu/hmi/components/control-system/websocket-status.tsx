@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Wifi, WifiOff } from "lucide-react"
-import { websocket, type WebSocketStatus } from "@/lib/websocket"
+import { websocket, type PollingStatus } from "@/lib/polling-manager"
 
 export function WebSocketStatusIndicator() {
-  const [status, setStatus] = useState<WebSocketStatus>("disconnected")
+  const [status, setStatus] = useState<PollingStatus>("disconnected")
 
   useEffect(() => {
     // Register for status updates
@@ -31,17 +31,17 @@ export function WebSocketStatusIndicator() {
       {status === "connected" ? (
         <>
           <Wifi className="w-4 h-4" />
-          Connected
+          Polling
         </>
       ) : status === "connecting" ? (
         <>
           <Wifi className="w-4 h-4 animate-pulse" />
-          Connecting...
+          Starting...
         </>
       ) : status === "error" ? (
         <>
           <WifiOff className="w-4 h-4" />
-          Connection Error
+          Polling Error
         </>
       ) : (
         <>
