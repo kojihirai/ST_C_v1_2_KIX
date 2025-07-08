@@ -22,6 +22,7 @@ class PollingManager {
   private statusChangeCallbacks: StatusChangeCallback[] = []
   private pollTimer: NodeJS.Timeout | null = null
   private isPolling = false
+  private deviceData: Record<string, unknown> = {}
 
   constructor(options: PollingManagerOptions) {
     this.baseUrl = options.baseUrl
@@ -110,6 +111,7 @@ class PollingManager {
 
       try {
         await this.fetchDeviceStatus()
+        await this.fetchDeviceData()
         this.retryCount = 0 // Reset retry count on success
         
         // Schedule next poll
@@ -162,6 +164,62 @@ class PollingManager {
     } catch (error) {
       console.error("Failed to fetch device status:", error)
       throw error
+    }
+  }
+
+  private async fetchDeviceData(): Promise<void> {
+    const devices = ["lcu", "dcu", "sdu"]
+    let individualEndpointsAvailable = false
+    
+    for (const device of devices) {
+      try {
+        // Try to get the latest data for each device
+        const response = await fetch(`${this.baseUrl}/device_data/${device}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          this.deviceData[device] = data
+          
+          // Notify handlers with individual device data
+          this.notifyMessageHandlers(`${device}_data`, data)
+          individualEndpointsAvailable = true
+        } else if (response.status === 404) {
+          // Device data endpoint not available, skip silently
+          console.debug(`Device data endpoint not available for ${device}`)
+        }
+      } catch (error) {
+        // Silently fail for individual device data - it's optional
+        console.debug(`Failed to fetch ${device} data:`, error)
+      }
+    }
+    
+    // If individual endpoints aren't available, try the bulk endpoint
+    if (!individualEndpointsAvailable) {
+      try {
+        const response = await fetch(`${this.baseUrl}/device_data/`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.devices) {
+            Object.entries(data.devices).forEach(([device, deviceData]) => {
+              this.deviceData[device] = deviceData
+              this.notifyMessageHandlers(`${device}_data`, { data: deviceData })
+            })
+          }
+        }
+      } catch (error) {
+        console.debug("Failed to fetch bulk device data:", error)
+      }
     }
   }
 
