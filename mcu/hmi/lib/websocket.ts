@@ -205,9 +205,22 @@ const getWebSocketUrl = (): string => {
   return 'ws://localhost:8000/ws'
 }
 
+// Alternative: Use specific IP if dynamic detection fails
+const getAlternativeWebSocketUrl = (): string => {
+  // You can hardcode the MCU IP here if needed
+  return 'ws://10.147.18.68:8000/ws'
+}
+
 // Create and export a singleton instance
 export const websocket = new WebSocketManager({
   url: getWebSocketUrl(),
   reconnectInterval: 3000,
   maxReconnectAttempts: 10,
+})
+
+// Export alternative websocket for testing
+export const websocketAlternative = new WebSocketManager({
+  url: getAlternativeWebSocketUrl(),
+  reconnectInterval: 3000,
+  maxReconnectAttempts: 5,
 })
