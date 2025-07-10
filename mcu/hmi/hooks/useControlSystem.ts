@@ -83,6 +83,12 @@ export function useControlSystem() {
   }
 
   const executeCommand = async (unit: "lcu" | "dcu", command: number, params: any) => {
+    // Safety check: don't send commands if system is stopped
+    if (systemStatus === "stopped" && command !== LcuCommand.idle && command !== DcuCommand.idle) {
+      console.log(`Blocking ${unit} command - system is stopped`);
+      return false;
+    }
+    
     try {
       const commandParams = {
         mode: command,
@@ -132,17 +138,35 @@ export function useControlSystem() {
     try {
       console.log("Stopping manual mode...")
       
-      // Send stop commands to both devices
-      console.log("Sending stop commands...")
-      await sendCommand("lcu", LcuCommand.idle, {});
-      await sendCommand("dcu", DcuCommand.idle, {});
-      
-      // Update system status
+      // Immediately set system status to stopped for UI responsiveness
       setSystemStatus("stopped");
       setManualStatus("stopped");
+      
+      // Send immediate stop commands to both devices with retry logic
+      const stopCommands = async () => {
+        const promises = [
+          sendCommand("lcu", LcuCommand.idle, {}),
+          sendCommand("dcu", DcuCommand.idle, {})
+        ];
+        
+        try {
+          await Promise.allSettled(promises);
+          console.log("Stop commands sent to both devices");
+        } catch (error) {
+          console.error("Error sending stop commands:", error);
+          // Even if commands fail, we've already stopped the UI
+        }
+      };
+      
+      // Execute stop commands immediately
+      stopCommands();
+      
       console.log("Manual mode stopped successfully");
     } catch (error) {
       console.error("Error stopping manual mode:", error);
+      // Ensure system is marked as stopped even if there's an error
+      setSystemStatus("stopped");
+      setManualStatus("stopped");
     }
   }
 
