@@ -114,25 +114,16 @@ def main():
     tester = ContactorTester()
     
     try:
-        # Test 1: Basic ON/OFF
-        print("\n📋 Test 1: Basic Contactor Control")
-        tester.test_contactor(duration=3)
-        
-        # Test 2: Pulse test
-        print("\n📋 Test 2: Pulse Test")
-        tester.pulse_test(pulses=3, on_time=0.5, off_time=0.5)
-        
-        # Test 3: Manual control demo
-        print("\n📋 Test 3: Manual Control Demo")
+        print("\n📋 Contactor Test: ON for 5 seconds, then OFF")
         print("Contactor will be ON for 5 seconds...")
         tester.enable_contactor()
         time.sleep(5)
         tester.disable_contactor()
         
-        print("\n✅ All tests completed successfully!")
+        print("\n✅ Test completed successfully!")
         
     except KeyboardInterrupt:
-        print("\n⚠️  Tests interrupted by user")
+        print("\n⚠️  Test interrupted by user")
     except Exception as e:
         print(f"\n✗ Error during testing: {e}")
     finally:
