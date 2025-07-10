@@ -2,9 +2,10 @@
 """
 Simple GPIO Tester for Contactor Control
 Enables GPIO 4 for contactor operation - ON/OFF only
+Uses pigpio library
 """
 
-import RPi.GPIO as GPIO
+import pigpio
 import time
 import sys
 import signal
@@ -15,16 +16,23 @@ CONTACTOR_GPIO = 4  # GPIO pin for contactor control
 class ContactorTester:
     def __init__(self, gpio_pin=CONTACTOR_GPIO):
         self.gpio_pin = gpio_pin
+        self.pi = None
         self.setup_gpio()
         
     def setup_gpio(self):
         """Initialize GPIO for contactor control"""
         try:
-            # Set GPIO mode to BCM numbering
-            GPIO.setmode(GPIO.BCM)
+            # Initialize pigpio
+            self.pi = pigpio.pi()
+            
+            if not self.pi.connected:
+                print("✗ Failed to connect to pigpiod daemon")
+                print("Make sure pigpiod is running: sudo pigpiod")
+                sys.exit(1)
             
             # Set GPIO pin as output
-            GPIO.setup(self.gpio_pin, GPIO.OUT, initial=GPIO.LOW)
+            self.pi.set_mode(self.gpio_pin, pigpio.OUTPUT)
+            self.pi.write(self.gpio_pin, 0)  # Start with LOW
             
             print(f"✓ GPIO {self.gpio_pin} initialized for contactor control")
             
@@ -35,7 +43,7 @@ class ContactorTester:
     def enable_contactor(self):
         """Turn contactor ON"""
         try:
-            GPIO.output(self.gpio_pin, GPIO.HIGH)
+            self.pi.write(self.gpio_pin, 1)
             print(f"✓ Contactor ON - GPIO {self.gpio_pin} HIGH")
         except Exception as e:
             print(f"✗ Error enabling contactor: {e}")
@@ -43,7 +51,7 @@ class ContactorTester:
     def disable_contactor(self):
         """Turn contactor OFF"""
         try:
-            GPIO.output(self.gpio_pin, GPIO.LOW)
+            self.pi.write(self.gpio_pin, 0)
             print(f"✓ Contactor OFF - GPIO {self.gpio_pin} LOW")
         except Exception as e:
             print(f"✗ Error disabling contactor: {e}")
@@ -87,7 +95,8 @@ class ContactorTester:
     def cleanup(self):
         """Clean up GPIO resources"""
         try:
-            GPIO.cleanup()
+            if self.pi:
+                self.pi.stop()
             print("✓ GPIO cleanup completed")
         except Exception as e:
             print(f"✗ Error during cleanup: {e}")
@@ -107,7 +116,7 @@ def main():
     # Set up signal handler for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
     
-    print("🔌 Simple GPIO Contactor Tester")
+    print("🔌 Simple GPIO Contactor Tester (pigpio)")
     print("=" * 40)
     
     # Initialize tester
