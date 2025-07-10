@@ -3,9 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
-import asyncpg
-import psycopg2
-import psycopg2.extras
 import json
 import asyncio
 import signal
@@ -33,8 +30,11 @@ origins = [
     "http://mcu.local:3001",
     "http://10.147.18.184:3001",
     "http://10.147.18.184:8000",
+    "http://10.147.18.68:3000",
+    "http://10.147.18.68:3001",
     "http://192.168.2.1:3001",
-    "http://102.168.2.10:3001"
+    "http://102.168.2.10:3001",
+    "*"  # Allow all origins for development
 ]
 
 app.add_middleware(
@@ -148,48 +148,63 @@ async def monitoring_loop():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    active_clients.append(websocket)
-    
-    # Send initial device status
-    initial_status = {
-        "type": "device_status_update",
-        "data": {
-            "devices": [status.dict() for status in device_status.values()],
-            "timestamp": datetime.now().isoformat()
-        }
-    }
-    await websocket.send_text(json.dumps(initial_status))
-    
     try:
+        await websocket.accept()
+        print("WebSocket client connected")
+        active_clients.append(websocket)
+        
+        # Send initial device status
+        try:
+            initial_status = {
+                "type": "device_status_update",
+                "data": {
+                    "devices": [status.dict() for status in device_status.values()],
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
+            await websocket.send_text(json.dumps(initial_status))
+            print("Initial status sent to client")
+        except Exception as e:
+            print(f"Error sending initial status: {e}")
+        
         while True:
-            message = await websocket.receive_text()
-            print(f"Received: {message}")
-            
-            # Handle different message types
             try:
-                data = json.loads(message)
-                if data.get("type") == "request_status":
-                    # Send current device status
-                    status_response = {
-                        "type": "device_status_update",
-                        "data": {
-                            "devices": [status.dict() for status in device_status.values()],
-                            "timestamp": datetime.now().isoformat()
-                        }
-                    }
-                    await websocket.send_text(json.dumps(status_response))
-                else:
-                    # Echo back other messages
-                    await websocket.send_text(f"Server Response: {message}")
-            except json.JSONDecodeError:
-                # Handle plain text messages
-                await websocket.send_text(f"Server Response: {message}")
+                message = await websocket.receive_text()
+                print(f"Received: {message}")
                 
-    except WebSocketDisconnect:
-        print("Client disconnected")
+                # Handle different message types
+                try:
+                    data = json.loads(message)
+                    if data.get("type") == "request_status":
+                        # Send current device status
+                        status_response = {
+                            "type": "device_status_update",
+                            "data": {
+                                "devices": [status.dict() for status in device_status.values()],
+                                "timestamp": datetime.now().isoformat()
+                            }
+                        }
+                        await websocket.send_text(json.dumps(status_response))
+                    else:
+                        # Echo back other messages
+                        await websocket.send_text(f"Server Response: {message}")
+                except json.JSONDecodeError:
+                    # Handle plain text messages
+                    await websocket.send_text(f"Server Response: {message}")
+                    
+            except WebSocketDisconnect:
+                print("Client disconnected")
+                break
+            except Exception as e:
+                print(f"Error handling message: {e}")
+                break
+                
+    except Exception as e:
+        print(f"WebSocket error: {e}")
     finally:
-        active_clients.remove(websocket)
+        if websocket in active_clients:
+            active_clients.remove(websocket)
+        print("WebSocket client removed from active clients")
 
 # --- MQTT Setup ---
 
@@ -274,6 +289,29 @@ async def get_device_health_summary():
             "offline": offline_count
         },
         "devices": {device: status.dict() for device, status in device_status.items()},
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/device_data/{device}")
+async def get_device_data(device: str):
+    """Get the latest data for a specific device"""
+    if device not in expected_devices:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    if device not in device_data:
+        return {"error": "No data available for this device"}
+    
+    return {
+        "device": device,
+        "data": device_data[device],
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/device_data/")
+async def get_all_device_data():
+    """Get the latest data for all devices"""
+    return {
+        "devices": device_data,
         "timestamp": datetime.now().isoformat()
     }
 

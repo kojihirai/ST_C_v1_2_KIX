@@ -8,11 +8,10 @@ from enum import Enum
 
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
-import time
 
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "dcu"
-MOTOR1_PINS = {"RPWM": 12, "LPWM": 13, "REN": 23, "LEN": 24}
+CONTACTOR_PIN = 4  # GPIO 4 (pin 7)
 
 class TorqueDriver:
     def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
@@ -75,25 +74,11 @@ class Mode(Enum):
 
 class Direction(Enum):
     IDLE = 0
-    CW = 1
-    CCW = 2
+    ON = 1
+    OFF = 2
 
-# === PID Controller ===
-class PIDController:
-    def __init__(self, kp, ki, kd):
-        self.kp, self.ki, self.kd = kp, ki, kd
-        self.integral = 0
-        self.prev_error = 0
-
-    def compute(self, setpoint, measured):
-        error = setpoint - measured
-        self.integral += error
-        derivative = error - self.prev_error
-        self.prev_error = error
-        return self.kp * error + self.ki * self.integral + self.kd * derivative
-
-# === Main Motor Controller ===
-class MotorController:
+# === Main Contactor Controller ===
+class ContactorController:
     def __init__(self):
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.connect(BROKER_IP, 1883, 60)
@@ -102,22 +87,14 @@ class MotorController:
         self.client.on_message = self.on_message
 
         self.mode = Mode.IDLE
-        self.direction = Direction.IDLE
-        self.target = 50
+        self.direction = Direction.OFF
 
-        self.torque_value = 0.0
-        self.torque_offset = 0.0
-        self.rpm_value = 0.0
-        self.rpm_offset = 0.0
-
+        # Initialize GPIO for contactor
         self.pi = pigpio.pi()
-        for pin in [MOTOR1_PINS["RPWM"], MOTOR1_PINS["LPWM"], MOTOR1_PINS["REN"], MOTOR1_PINS["LEN"]]:
-            self.pi.set_mode(pin, pigpio.OUTPUT)
-            self.pi.write(pin, 0)  # Ensure all pins start in disabled state
-        # Keep enable pins disabled until motor is commanded to run
-        # self.pi.write(MOTOR1_PINS["REN"], 1)  # Removed - don't enable on startup
-        # self.pi.write(MOTOR1_PINS["LEN"], 1)  # Removed - don't enable on startup
+        self.pi.set_mode(CONTACTOR_PIN, pigpio.OUTPUT)
+        self.pi.write(CONTACTOR_PIN, 0)  # Start with contactor OFF
 
+        # Initialize torque sensor
         self.torque_sensor = TorqueDriver(
             port="/dev/ttyACM0",
             baudrate=19200,
@@ -129,6 +106,9 @@ class MotorController:
         )
         if not self.torque_sensor.connected:
             self.send_error("Torque sensor failed to connect")
+
+        self.torque_value = 0.0
+        self.rpm_value = 0.0
 
         self.running = True
         threading.Thread(target=self.run, daemon=True).start()
@@ -149,61 +129,49 @@ class MotorController:
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
-            self.mode = Mode(data.get("mode", 0))
-            self.direction = Direction(data.get("direction", 0))
-            self.target = data.get("target", 50)
+            new_mode = Mode(data.get("mode", 0))
+            new_direction = Direction(data.get("direction", 0))
+            
+            # If switching to IDLE, immediately turn off contactor
+            if new_mode == Mode.IDLE:
+                self.set_contactor(False)
+                print("Immediate stop command received - contactor OFF")
+            
+            self.mode = new_mode
+            self.direction = new_direction
 
-            print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}, Speed={self.target}")
+            print(f"Received: Mode={self.mode.name}, Dir={self.direction.name}")
         except Exception as e:
             self.send_error(f"MQTT command error: {e}")
 
-    def set_motor(self, value):
-        pwm_val = int(min(max(abs(value), 0), 100) * 2.55)
-        forward = value >= 0 if self.direction == Direction.CW else value < 0
-        
-        if pwm_val > 0:
-            self.pi.write(MOTOR1_PINS["REN"], 1)
-            self.pi.write(MOTOR1_PINS["LEN"], 1)
-            
-            if forward:
-                self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], pwm_val)
-                self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], 0)
-            else:
-                self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], 0)
-                self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], pwm_val)
-        else:
-            # Disable motor driver when no movement
-            self.stop_motor()
-
-    def stop_motor(self):
-        self.pi.set_PWM_dutycycle(MOTOR1_PINS["RPWM"], 0)
-        self.pi.set_PWM_dutycycle(MOTOR1_PINS["LPWM"], 0)
-        # Disable motor driver when stopped
-        self.pi.write(MOTOR1_PINS["REN"], 0)
-        self.pi.write(MOTOR1_PINS["LEN"], 0)
+    def set_contactor(self, state):
+        """Set contactor state: True for ON, False for OFF"""
+        self.pi.write(CONTACTOR_PIN, 1 if state else 0)
+        print(f"Contactor {'ON' if state else 'OFF'}")
 
     def run(self):
         while self.running:
             self.read_sensors()
 
             if self.mode == Mode.IDLE:
-                self.stop_motor()
-
+                self.set_contactor(False)
             elif self.mode == Mode.RUN_CONTINUOUS:
-                target = self.target * 100 / 24
-                self.set_motor(target)
-            
+                if self.direction == Direction.ON:
+                    self.set_contactor(True)
+                else:
+                    self.set_contactor(False)
             else:
-                pass
+                self.set_contactor(False)
 
             time.sleep(0.05)
 
     def publish_status(self):
         while self.running:
+            contactor_state = self.pi.read(CONTACTOR_PIN)
             status = {
                 "mode": self.mode.value,
                 "direction": self.direction.value,
-                "target": self.target,
+                "contactor_state": contactor_state,
                 "rpm": round(self.rpm_value, 1),
                 "torque": round(self.torque_value, 2),
             }
@@ -218,13 +186,13 @@ class MotorController:
     def stop(self):
         self.running = False
         self.client.loop_stop()
-        self.stop_motor()
+        self.set_contactor(False)  # Ensure contactor is OFF when stopping
         self.pi.stop()
         print("DCU stopped.")
 
 if __name__ == "__main__":
     try:
-        controller = MotorController()
+        controller = ContactorController()
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
