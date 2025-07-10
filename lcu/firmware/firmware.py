@@ -144,14 +144,13 @@ class PIDController:
 class Mode(Enum):
     IDLE = 0
     RUN_CONTINUOUS = 2
-    PID_SPEED = 6
     HOMING = 8
 
 
 class Direction(Enum):
     IDLE = 0
-    FW = 2
-    BW = 1
+    BW = 1   # Backward
+    FW = 2   # Forward
 
 
 BROKER_IP           = "192.168.2.1"
@@ -275,12 +274,13 @@ class MotorSystem:
         try:
             data = json.loads(msg.payload.decode())
             with self.state_lock:
-                if not self.is_homed and not self.homing_in_progress:
-                    print("System not homed - initiating homing sequence")
-                    self.mode = Mode.HOMING
-                    return
                 if 'mode' in data:
-                    self.mode = Mode(data['mode'])
+                    new_mode = Mode(data['mode'])
+                    # If switching to IDLE, immediately stop motor
+                    if new_mode == Mode.IDLE:
+                        self.control_motor(0, Direction.IDLE)
+                        print("Immediate stop command received")
+                    self.mode = new_mode
                 if 'direction' in data:
                     self.direction = Direction(data['direction'])
                 if 'target' in data:
@@ -352,12 +352,23 @@ class MotorSystem:
                 if not self.is_homed:
                     self._do_homing()
                 elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
-                    ref = tgt if direction == Direction.FW else -tgt
+                    # Use the direction directly from the command
+                    if direction == Direction.FW:
+                        ref = tgt
+                        dir_ = Direction.FW
+                    elif direction == Direction.BW:
+                        ref = -tgt
+                        dir_ = Direction.BW
+                    else:
+                        ref = 0
+                        dir_ = Direction.IDLE
+                    
                     out = self.speed_pid.compute(ref, self.current_speed)
                     duty = abs(out)
-                    dir_ = Direction.FW if out >= 0 else Direction.BW
                     self.control_motor(duty, dir_)
                     self.last_pid_update = now
+            elif mode == Mode.IDLE:
+                self.control_motor(0, Direction.IDLE)
             else:
                 self.control_motor(0, Direction.IDLE)
 
