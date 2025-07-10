@@ -17,8 +17,8 @@ export enum LcuDirection {
 
 export enum DcuDirection {
   idle = 0,
-  ccw = 1,  // Counter-clockwise
-  cw = 2,   // Clockwise
+  off = 2,  // Contactor OFF (Stop/Pause)
+  on = 1,   // Contactor ON
 }
 
 export type SystemMode = "manual"

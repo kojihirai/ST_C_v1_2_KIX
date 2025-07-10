@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Activity, Gauge, Zap, Settings } from "lucide-react"
+import { Activity, Zap, Settings, Power } from "lucide-react"
 import { websocket } from "@/lib/polling-manager"
 
 interface DeviceStatus {
@@ -33,6 +33,7 @@ interface DcuData {
   mode?: number
   direction?: number
   target?: number
+  contactor_state?: number
 }
 
 interface SduData {
@@ -147,7 +148,7 @@ export function DeviceStatusIndicator() {
       case "lcu":
         return <Settings className="w-3 h-3" />
       case "dcu":
-        return <Gauge className="w-3 h-3" />
+        return <Power className="w-3 h-3" />
       case "sdu":
         return <Zap className="w-3 h-3" />
       default:
@@ -182,8 +183,8 @@ export function DeviceStatusIndicator() {
         break
       case "dcu":
         const dcuData = data as DcuData
-        if (dcuData.rpm !== undefined && dcuData.torque !== undefined) {
-          return `${dcuData.rpm.toFixed(1)}rpm | ${dcuData.torque.toFixed(2)}Nm`
+        if (dcuData.contactor_state !== undefined) {
+          return `Contactor: ${dcuData.contactor_state === 1 ? 'ON' : 'OFF'}`
         }
         break
       case "sdu":

@@ -15,8 +15,6 @@ interface ControlPanelProps {
   setDcuDirection: (direction: DcuDirection) => void
   lcuTarget: number
   setLcuTarget: (target: number) => void
-  dcuTarget: number
-  setDcuTarget: (target: number) => void
   executeCommand: (unit: "lcu" | "dcu", command: LcuCommand | DcuCommand, params: Record<string, number | string>) => void
   executeOnChange?: boolean
 }
@@ -28,8 +26,6 @@ export default function ControlPanel({
   setDcuDirection,
   lcuTarget,
   setLcuTarget,
-  dcuTarget,
-  setDcuTarget,
   executeCommand,
   executeOnChange = false
 }: ControlPanelProps) {
@@ -74,17 +70,17 @@ export default function ControlPanel({
 
   const executeDcuCommand = async () => {
     // Only send command if values have changed
-    if (lastDcuCommand?.direction === dcuDirection && lastDcuCommand?.target === dcuTarget) {
+    if (lastDcuCommand?.direction === dcuDirection) {
       return;
     }
 
     let params: Record<string, number | string> = {}
     let command: DcuCommand = DcuCommand.idle
 
-    // Simplified command logic - just use run_cont for all active commands
-    if (dcuTarget > 0) {
+    // Simplified command logic - just use run_cont for ON state
+    if (dcuDirection === DcuDirection.on) {
       command = DcuCommand.run_cont
-      params = { target: dcuTarget, direction: dcuDirection }
+      params = { direction: dcuDirection }
     } else {
       command = DcuCommand.idle
     }
@@ -95,7 +91,7 @@ export default function ControlPanel({
     try {
       await executeCommand("dcu", command, params)
       setDcuStatus("Sent")
-      setLastDcuCommand({ direction: dcuDirection, target: dcuTarget })
+      setLastDcuCommand({ direction: dcuDirection, target: 0 })
       
       // Clear status after 2 seconds
       setTimeout(() => setDcuStatus(""), 2000)
@@ -118,19 +114,6 @@ export default function ControlPanel({
     }
   }
 
-  const stopDcu = async () => {
-    setDcuStatus("Stopping...")
-    try {
-      await executeCommand("dcu", DcuCommand.idle, {})
-      setDcuStatus("Stopped")
-      setLastDcuCommand(null)
-      setTimeout(() => setDcuStatus(""), 2000)
-    } catch (error) {
-      setDcuStatus("Stop failed")
-      console.error("DCU stop failed:", error)
-    }
-  }
-
   const resumeLcu = async () => {
     if (lastLcuCommand) {
       setLcuStatus("Resuming...")
@@ -141,20 +124,6 @@ export default function ControlPanel({
       } catch (error) {
         setLcuStatus("Resume failed")
         console.error("LCU resume failed:", error)
-      }
-    }
-  }
-
-  const resumeDcu = async () => {
-    if (lastDcuCommand) {
-      setDcuStatus("Resuming...")
-      try {
-        await executeCommand("dcu", DcuCommand.run_cont, { target: lastDcuCommand.target, direction: lastDcuCommand.direction })
-        setDcuStatus("Resumed")
-        setTimeout(() => setDcuStatus(""), 2000)
-      } catch (error) {
-        setDcuStatus("Resume failed")
-        console.error("DCU resume failed:", error)
       }
     }
   }
@@ -193,25 +162,15 @@ export default function ControlPanel({
       {/* DCU Controls */}
       <Card className="shadow-sm">
         <CardHeader className="py-2 px-3 flex flex-row justify-between items-center">
-          <CardTitle className="text-sm">Drill Controls</CardTitle>
+          <CardTitle className="text-sm">Contactor Controls</CardTitle>
           <div className="flex gap-2 items-center">
             {dcuStatus && <span className="text-xs text-gray-600">{dcuStatus}</span>}
-            <Button variant="outline" className="h-8 px-2 text-xs" onClick={resumeDcu} disabled={!lastDcuCommand}>
-              <Play className="w-3 h-3 mr-1" />
-              Resume
-            </Button>
-            <Button variant="outline" className="h-8 px-2 text-xs" onClick={stopDcu}>
-              <Square className="w-3 h-3 mr-1 fill-current" />
-              Stop
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-3">
           <DcuControlTab
             dcuDirection={dcuDirection}
             setDcuDirection={setDcuDirection}
-            dcuTarget={dcuTarget}
-            setDcuTarget={setDcuTarget}
             executeDcuCommand={executeDcuCommand}
             executeOnChange={executeOnChange}
             isReadOnly={false}

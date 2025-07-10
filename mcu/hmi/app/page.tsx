@@ -17,8 +17,6 @@ export default function ControlSystemMinimal() {
     setDcuDirection,
     lcuTarget,
     setLcuTarget,
-    dcuTarget,
-    setDcuTarget,
     startManual,
     stopManual,
     executeCommand
@@ -93,8 +91,6 @@ export default function ControlSystemMinimal() {
           setDcuDirection={setDcuDirection}
           lcuTarget={lcuTarget}
           setLcuTarget={setLcuTarget}
-          dcuTarget={dcuTarget}
-          setDcuTarget={setDcuTarget}
           executeCommand={executeCommand}
           executeOnChange={systemStatus === "running"}
         />

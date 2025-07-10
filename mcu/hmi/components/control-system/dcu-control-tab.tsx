@@ -1,26 +1,12 @@
-import { RotateCw } from 'lucide-react'
+import { Pause, Play } from 'lucide-react'
 import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useEffect } from "react"
 import { DcuDirection } from "@/lib/constants"
 
-// Input range configurations
-const INPUT_RANGES = {
-  speed: {
-    min: 0,
-    max: 24,
-    step: 0.1,
-    label: "Effective Voltage (V)"
-  }
-} as const
-
 interface DcuControlTabProps {
   dcuDirection: DcuDirection
   setDcuDirection: (direction: DcuDirection) => void
-  dcuTarget: number
-  setDcuTarget: (target: number) => void
   executeDcuCommand: () => void
   executeOnChange?: boolean
   isReadOnly?: boolean
@@ -30,17 +16,15 @@ interface DcuControlTabProps {
 export default function DcuControlTab({
   dcuDirection,
   setDcuDirection,
-  dcuTarget,
-  setDcuTarget,
   executeDcuCommand,
   executeOnChange = false,
   isReadOnly = false,
   projectDirection
 }: DcuControlTabProps) {
-  // Set CW as default direction
+  // Set OFF as default direction
   useEffect(() => {
     if (!isReadOnly) {
-      setDcuDirection(DcuDirection.cw);
+      setDcuDirection(DcuDirection.off);
     }
   }, [setDcuDirection, isReadOnly]);
 
@@ -52,13 +36,13 @@ export default function DcuControlTab({
       }, 50) // Add a small delay to debounce rapid changes
       return () => clearTimeout(timeoutId)
     }
-  }, [dcuTarget, dcuDirection, executeOnChange, executeDcuCommand, isReadOnly])
+  }, [dcuDirection, executeOnChange, executeDcuCommand, isReadOnly])
 
   // Convert string direction to enum if needed
   const getProjectDirectionEnum = () => {
     if (typeof projectDirection === 'string') {
-      if (projectDirection === 'cw') return DcuDirection.cw;
-      if (projectDirection === 'ccw') return DcuDirection.ccw;
+      if (projectDirection === 'on') return DcuDirection.on;
+      if (projectDirection === 'off') return DcuDirection.off;
     }
     return projectDirection;
   };
@@ -67,55 +51,34 @@ export default function DcuControlTab({
 
   return (
     <div className="space-y-3">
-      {/* Direction Selection */}
+      {/* Contactor Control */}
       <div>
-        <Label className="text-xs mb-1 block">Direction</Label>
+        <Label className="text-xs mb-1 block">Contactor Control</Label>
         <div className="grid grid-cols-2 gap-2">
           <Button
-            variant={isReadOnly ? (projectDirectionEnum === DcuDirection.cw ? "default" : "outline") : (dcuDirection === DcuDirection.cw ? "default" : "outline")}
-            onClick={() => !isReadOnly && setDcuDirection(DcuDirection.cw)}
+            variant={isReadOnly ? (projectDirectionEnum === DcuDirection.on ? "default" : "outline") : (dcuDirection === DcuDirection.on ? "default" : "outline")}
+            onClick={() => !isReadOnly && setDcuDirection(DcuDirection.on)}
             className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
             disabled={isReadOnly}
           >
-            Clockwise
-            <RotateCw className="w-3 h-3" />
+            <Play className="w-3 h-3" />
+            ON
           </Button>
           <Button
-            variant={isReadOnly ? (projectDirectionEnum === DcuDirection.ccw ? "default" : "outline") : (dcuDirection === DcuDirection.ccw ? "default" : "outline")}
-            onClick={() => !isReadOnly && setDcuDirection(DcuDirection.ccw)}
+            variant={isReadOnly ? (projectDirectionEnum === DcuDirection.off ? "default" : "outline") : (dcuDirection === DcuDirection.off ? "default" : "outline")}
+            onClick={() => !isReadOnly && setDcuDirection(DcuDirection.off)}
             className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
             disabled={isReadOnly}
           >
-            Counter-CW
-            <RotateCw className="w-3 h-3 -scale-x-100" />
+            <Pause className="w-3 h-3" />
+            OFF
           </Button>
         </div>
       </div>
 
-      {/* Target Value */}
-      <div>
-        <Label className="text-xs mb-1 block">{INPUT_RANGES.speed.label}</Label>
-        <div className="flex items-center gap-2">
-          <Slider
-            value={[dcuTarget]}
-            min={INPUT_RANGES.speed.min}
-            max={INPUT_RANGES.speed.max}
-            step={INPUT_RANGES.speed.step}
-            onValueChange={(value) => !isReadOnly && setDcuTarget(value[0])}
-            className="h-5"
-            disabled={isReadOnly}
-          />
-          <Input
-            type="number"
-            value={dcuTarget}
-            min={INPUT_RANGES.speed.min}
-            max={INPUT_RANGES.speed.max}
-            step={INPUT_RANGES.speed.step}
-            onChange={(e) => !isReadOnly && setDcuTarget(Number.parseFloat(e.target.value))}
-            className="w-20 h-8 text-xs"
-            disabled={isReadOnly}
-          />
-        </div>
+      {/* Status Display */}
+      <div className="text-xs text-muted-foreground">
+        <p>Current State: {dcuDirection === DcuDirection.on ? 'ON' : 'OFF'}</p>
       </div>
     </div>
   )
