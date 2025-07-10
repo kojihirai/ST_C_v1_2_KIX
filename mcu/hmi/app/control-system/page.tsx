@@ -10,8 +10,7 @@ export default function ControlSystemPage() {
   const [lcuDirection, setLcuDirection] = useState<LcuDirection>(LcuDirection.fw)
   const [lcuTarget, setLcuTarget] = useState(0)
 
-  const [dcuDirection, setDcuDirection] = useState<DcuDirection>(DcuDirection.cw)
-  const [dcuTarget, setDcuTarget] = useState(0)
+  const [dcuDirection, setDcuDirection] = useState<DcuDirection>(DcuDirection.off)
 
   const executeCommand = async (unit: "lcu" | "dcu", command: LcuCommand | DcuCommand, params: Record<string, number | string>) => {
     console.log(`Executing ${unit} command:`, command, params)
@@ -54,8 +53,6 @@ export default function ControlSystemPage() {
           setDcuDirection={setDcuDirection}
           lcuTarget={lcuTarget}
           setLcuTarget={setLcuTarget}
-          dcuTarget={dcuTarget}
-          setDcuTarget={setDcuTarget}
           executeCommand={executeCommand}
           executeOnChange={true}
         />
