@@ -44,16 +44,6 @@ export default function LcuControlTab({
     }
   }, [setLcuDirection, isReadOnly]);
 
-  // Execute command when values change if executeOnChange is true
-  useEffect(() => {
-    if (executeOnChange && !isReadOnly) {
-      const timeoutId = setTimeout(() => {
-        executeLcuCommand()
-      }, 50) // Add a small delay to debounce rapid changes
-      return () => clearTimeout(timeoutId)
-    }
-  }, [lcuTarget, lcuDirection, executeOnChange, executeLcuCommand, isReadOnly])
-
   // Convert string direction to enum if needed
   const getProjectDirectionEnum = () => {
     if (typeof projectDirection === 'string') {
@@ -65,6 +55,28 @@ export default function LcuControlTab({
 
   const projectDirectionEnum = getProjectDirectionEnum();
 
+  // Handle direction change with optional command execution
+  const handleDirectionChange = (newDirection: LcuDirection) => {
+    if (!isReadOnly) {
+      setLcuDirection(newDirection);
+      // Only execute command if executeOnChange is true
+      if (executeOnChange) {
+        executeLcuCommand();
+      }
+    }
+  };
+
+  // Handle target change with optional command execution
+  const handleTargetChange = (newTarget: number) => {
+    if (!isReadOnly) {
+      setLcuTarget(newTarget);
+      // Only execute command if executeOnChange is true
+      if (executeOnChange) {
+        executeLcuCommand();
+      }
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* Direction Selection */}
@@ -73,7 +85,7 @@ export default function LcuControlTab({
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant={isReadOnly ? (projectDirectionEnum === LcuDirection.fw ? "default" : "outline") : (lcuDirection === LcuDirection.fw ? "default" : "outline")}
-            onClick={() => !isReadOnly && setLcuDirection(LcuDirection.fw)}
+            onClick={() => handleDirectionChange(LcuDirection.fw)}
             className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
             disabled={isReadOnly}
           >
@@ -82,7 +94,7 @@ export default function LcuControlTab({
           </Button>
           <Button
             variant={isReadOnly ? (projectDirectionEnum === LcuDirection.bw ? "default" : "outline") : (lcuDirection === LcuDirection.bw ? "default" : "outline")}
-            onClick={() => !isReadOnly && setLcuDirection(LcuDirection.bw)}
+            onClick={() => handleDirectionChange(LcuDirection.bw)}
             className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
             disabled={isReadOnly}
           >
@@ -101,7 +113,7 @@ export default function LcuControlTab({
             min={INPUT_RANGES.speed.min}
             max={INPUT_RANGES.speed.max}
             step={INPUT_RANGES.speed.step}
-            onValueChange={(value) => !isReadOnly && setLcuTarget(value[0])}
+            onValueChange={(value) => handleTargetChange(value[0])}
             className="h-5"
             disabled={isReadOnly}
           />
@@ -111,7 +123,7 @@ export default function LcuControlTab({
             min={INPUT_RANGES.speed.min}
             max={INPUT_RANGES.speed.max}
             step={INPUT_RANGES.speed.step}
-            onChange={(e) => !isReadOnly && setLcuTarget(Number.parseFloat(e.target.value))}
+            onChange={(e) => handleTargetChange(Number.parseFloat(e.target.value))}
             className="w-20 h-8 text-xs"
             disabled={isReadOnly}
           />

@@ -28,16 +28,6 @@ export default function DcuControlTab({
     }
   }, [setDcuDirection, isReadOnly]);
 
-  // Execute command when values change if executeOnChange is true
-  useEffect(() => {
-    if (executeOnChange && !isReadOnly) {
-      const timeoutId = setTimeout(() => {
-        executeDcuCommand()
-      }, 50) // Add a small delay to debounce rapid changes
-      return () => clearTimeout(timeoutId)
-    }
-  }, [dcuDirection, executeOnChange, executeDcuCommand, isReadOnly])
-
   // Convert string direction to enum if needed
   const getProjectDirectionEnum = () => {
     if (typeof projectDirection === 'string') {
@@ -49,6 +39,17 @@ export default function DcuControlTab({
 
   const projectDirectionEnum = getProjectDirectionEnum();
 
+  // Handle direction change with optional command execution
+  const handleDirectionChange = (newDirection: DcuDirection) => {
+    if (!isReadOnly) {
+      setDcuDirection(newDirection);
+      // Only execute command if executeOnChange is true
+      if (executeOnChange) {
+        executeDcuCommand();
+      }
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* Contactor Control */}
@@ -57,7 +58,7 @@ export default function DcuControlTab({
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant={isReadOnly ? (projectDirectionEnum === DcuDirection.on ? "default" : "outline") : (dcuDirection === DcuDirection.on ? "default" : "outline")}
-            onClick={() => !isReadOnly && setDcuDirection(DcuDirection.on)}
+            onClick={() => handleDirectionChange(DcuDirection.on)}
             className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
             disabled={isReadOnly}
           >
@@ -66,7 +67,7 @@ export default function DcuControlTab({
           </Button>
           <Button
             variant={isReadOnly ? (projectDirectionEnum === DcuDirection.off ? "default" : "outline") : (dcuDirection === DcuDirection.off ? "default" : "outline")}
-            onClick={() => !isReadOnly && setDcuDirection(DcuDirection.off)}
+            onClick={() => handleDirectionChange(DcuDirection.off)}
             className="flex items-center justify-center gap-1 py-1.5 h-9 text-xs"
             disabled={isReadOnly}
           >
