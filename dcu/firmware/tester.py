@@ -136,7 +136,7 @@ def main():
     except Exception as e:
         print(f"\n✗ Error during testing: {e}")
     finally:
-        # Cleanup
+
         tester.cleanup()
 
 if __name__ == "__main__":
