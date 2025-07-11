@@ -11,7 +11,7 @@ import sys
 import signal
 
 # GPIO Configuration
-CONTACTOR_GPIO = 4  # GPIO pin for contactor control
+CONTACTOR_GPIO = 27  # GPIO pin for contactor control
 
 class ContactorTester:
     def __init__(self, gpio_pin=CONTACTOR_GPIO):

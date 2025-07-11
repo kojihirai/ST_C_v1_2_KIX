@@ -11,8 +11,7 @@ from pymodbus.exceptions import ModbusException
 
 BROKER_IP = "192.168.2.1"
 DEVICE_ID = "dcu"
-CONTACTOR_PIN = 4  # GPIO 4 (pin 7)
-
+CONTACTOR_PIN = 27
 class TorqueDriver:
     def __init__(self, port, baudrate, parity, stopbits, bytesize, timeout, slave_id):
         self.client = ModbusSerialClient(
