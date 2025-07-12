@@ -362,9 +362,14 @@ class MotorSystem:
                     else:
                         ref = 0
                         dir_ = Direction.IDLE
+                        # Reset PID when stopping to clear accumulated error
+                        self.speed_pid.reset()
                     
                     out = self.speed_pid.compute(ref, self.current_speed)
                     duty = abs(out)
+                    # Force duty to 0 when direction is IDLE
+                    if dir_ == Direction.IDLE:
+                        duty = 0
                     self.control_motor(duty, dir_)
                     self.last_pid_update = now
             elif mode == Mode.IDLE:
