@@ -279,7 +279,8 @@ class MotorSystem:
                     # If switching to IDLE, immediately stop motor
                     if new_mode == Mode.IDLE:
                         self.control_motor(0, Direction.IDLE)
-                        print("Immediate stop command received")
+                        self.speed_pid.reset()  # Reset PID when stopping
+                        print("Immediate stop command received - motor stopped and PID reset")
                     self.mode = new_mode
                 if 'direction' in data:
                     self.direction = Direction(data['direction'])
@@ -346,6 +347,10 @@ class MotorSystem:
             with self.state_lock:
                 mode, direction, tgt = self.mode, self.direction, self.target
 
+            # Debug: print current state every few seconds
+            if int(now) % 5 == 0:  # Print every 5 seconds
+                print(f"Run loop: mode={mode}, dir={direction}, tgt={tgt}, speed={self.current_speed:.3f}")
+
             if mode == Mode.HOMING:
                 self._do_homing()
             elif mode == Mode.RUN_CONTINUOUS:
@@ -379,6 +384,8 @@ class MotorSystem:
                         self.last_pid_update = now
             elif mode == Mode.IDLE:
                 self.control_motor(0, Direction.IDLE)
+                self.speed_pid.reset()  # Reset PID when in IDLE mode
+                print("IDLE mode - motor stopped")
             else:
                 self.control_motor(0, Direction.IDLE)
 
