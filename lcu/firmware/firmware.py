@@ -149,8 +149,8 @@ class Mode(Enum):
 
 class Direction(Enum):
     IDLE = 0
-    BW = 1   # Backward
-    FW = 2   # Forward
+    BW = 2   # Backward
+    FW = 1   # Forward
 
 
 BROKER_IP           = "192.168.2.1"
