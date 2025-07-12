@@ -72,7 +72,7 @@ class LoadCellDriver:
                 if signed:
                     raw = struct.unpack('>i', struct.pack('>I', raw))[0]
 
-            scaled = raw / self.scale_factor
+            scaled = raw
             return scaled
 
         except ModbusException as e:
