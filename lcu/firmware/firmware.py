@@ -252,10 +252,9 @@ class MotorSystem:
         return (new_ticks - prev_ticks) / PULSES_PER_MM / dt_sec
 
     def control_motor(self, duty_percent, direction):
+        duty = int(1_000_000 * max(min(duty_percent, DUTY_MAX), DUTY_MIN) / 100)
         
-        
-        if duty_percent > 0:
-            duty = int(1_000_000 * max(min(duty_percent, DUTY_MAX), DUTY_MIN) / 100)
+        if duty > 0 and direction != Direction.IDLE:
             self.pi.write(MOTOR_PINS["REN"], 1)
             self.pi.write(MOTOR_PINS["LEN"], 1)
             
