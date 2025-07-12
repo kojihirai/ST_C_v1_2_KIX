@@ -352,26 +352,31 @@ class MotorSystem:
                 if not self.is_homed:
                     self._do_homing()
                 elif now - self.last_pid_update >= PID_UPDATE_INTERVAL:
-                    # Use the direction directly from the command
-                    if direction == Direction.FW:
-                        ref = tgt
-                        dir_ = Direction.FW
-                    elif direction == Direction.BW:
-                        ref = -tgt
-                        dir_ = Direction.BW
+                    # Check if direction is IDLE first - if so, stop immediately
+                    if direction == Direction.IDLE:
+                        self.control_motor(0, Direction.IDLE)
+                        self.speed_pid.reset()  # Reset PID to clear accumulated error
+                        self.last_pid_update = now
                     else:
-                        ref = 0
-                        dir_ = Direction.IDLE
-                        # Reset PID when stopping to clear accumulated error
-                        self.speed_pid.reset()
-                    
-                    out = self.speed_pid.compute(ref, self.current_speed)
-                    duty = abs(out)
-                    # Force duty to 0 when direction is IDLE
-                    if dir_ == Direction.IDLE:
-                        duty = 0
-                    self.control_motor(duty, dir_)
-                    self.last_pid_update = now
+                        # Use the direction directly from the command
+                        if direction == Direction.FW:
+                            ref = tgt
+                            dir_ = Direction.FW
+                        elif direction == Direction.BW:
+                            ref = -tgt
+                            dir_ = Direction.BW
+                        else:
+                            ref = 0
+                            dir_ = Direction.IDLE
+                            self.speed_pid.reset()
+                        
+                        out = self.speed_pid.compute(ref, self.current_speed)
+                        duty = abs(out)
+                        # Force duty to 0 when direction is IDLE
+                        if dir_ == Direction.IDLE:
+                            duty = 0
+                        self.control_motor(duty, dir_)
+                        self.last_pid_update = now
             elif mode == Mode.IDLE:
                 self.control_motor(0, Direction.IDLE)
             else:
