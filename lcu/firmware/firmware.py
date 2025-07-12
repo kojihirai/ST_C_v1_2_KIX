@@ -265,10 +265,12 @@ class MotorSystem:
                 self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
                 self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, duty)
         else:
-            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
-            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
             self.pi.write(MOTOR_PINS["REN"], 0)
             self.pi.write(MOTOR_PINS["LEN"], 0)
+
+            self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
+            self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
+
 
     def on_message(self, client, userdata, msg):
         try:
@@ -349,7 +351,7 @@ class MotorSystem:
 
             # Debug: print current state every few seconds
             if int(now) % 5 == 0:  # Print every 5 seconds
-                print(f"Run loop: mode={mode}, dir={direction}, tgt={tgt}, speed={self.current_speed:.3f}")
+                print(f"Run loop: mode={mode}, dir={direction}, tgt={tgt}")
 
             if mode == Mode.HOMING:
                 self._do_homing()
