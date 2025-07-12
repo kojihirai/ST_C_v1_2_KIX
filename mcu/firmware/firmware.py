@@ -84,8 +84,6 @@ def update_device_status(device: str, data: dict):
         device_status[device].status = "online"
         print(f"Device {device} is now ONLINE")
     
-
-    
     # Trigger immediate broadcast if status changed
     if previous_status != device_status[device].status:
         asyncio.create_task(broadcast_device_status())
