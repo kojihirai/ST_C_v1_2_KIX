@@ -55,7 +55,7 @@ recording_flag = threading.Event()
 last_mode = 0
 last_dir = 0
 
-USB_MOUNT_PATH = "/media/pi/BEA6-BBCE"
+USB_MOUNT_PATH = "/media/pi/BEA6-BBCE5"
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FPS = 20.0
