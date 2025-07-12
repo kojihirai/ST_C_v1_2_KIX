@@ -267,7 +267,6 @@ class MotorSystem:
         else:
             self.pi.write(MOTOR_PINS["REN"], 0)
             self.pi.write(MOTOR_PINS["LEN"], 0)
-
             self.pi.hardware_PWM(MOTOR_PINS["RPWM"], PWM_FREQ, 0)
             self.pi.hardware_PWM(MOTOR_PINS["LPWM"], PWM_FREQ, 0)
 
