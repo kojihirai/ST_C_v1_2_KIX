@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
@@ -12,6 +13,7 @@ import cv2
 import shutil
 import os
 import threading
+import glob
 
 # --- Models ---
 
@@ -55,7 +57,7 @@ recording_flag = threading.Event()
 last_mode = 0
 last_dir = 0
 
-USB_MOUNT_PATH = "/media/pi/BEA6-BBCE5"
+USB_MOUNT_PATH = "/media/pi/BEA6-BBCE6"
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FPS = 20.0
@@ -282,6 +284,121 @@ async def get_device_data(device: str):
         "data": device_data[device],
         "timestamp": datetime.now().isoformat()
     }
+
+# --- Video Endpoints ---
+
+@app.get("/videos/")
+async def list_videos():
+    """List all available video files on USB drive"""
+    if not os.path.exists(USB_MOUNT_PATH):
+        raise HTTPException(status_code=404, detail="USB drive not found")
+    
+    video_files = glob.glob(os.path.join(USB_MOUNT_PATH, "*.avi"))
+    videos = []
+    
+    for video_file in video_files:
+        filename = os.path.basename(video_file)
+        stat = os.stat(video_file)
+        videos.append({
+            "filename": filename,
+            "size": stat.st_size,
+            "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+        })
+    
+    return {
+        "videos": sorted(videos, key=lambda x: x["modified"], reverse=True),
+        "total_count": len(videos)
+    }
+
+@app.get("/videos/{filename}")
+async def stream_video(filename: str):
+    """Stream a specific video file"""
+    if not os.path.exists(USB_MOUNT_PATH):
+        raise HTTPException(status_code=404, detail="USB drive not found")
+    
+    video_path = os.path.join(USB_MOUNT_PATH, filename)
+    
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found")
+    
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    return FileResponse(
+        path=video_path,
+        media_type="video/x-msvideo",
+        filename=filename
+    )
+
+@app.get("/videos/{filename}/info")
+async def get_video_info(filename: str):
+    """Get information about a specific video file"""
+    if not os.path.exists(USB_MOUNT_PATH):
+        raise HTTPException(status_code=404, detail="USB drive not found")
+    
+    video_path = os.path.join(USB_MOUNT_PATH, filename)
+    
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found")
+    
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    stat = os.stat(video_path)
+    
+    # Try to get video metadata using OpenCV
+    cap = cv2.VideoCapture(video_path)
+    if cap.isOpened():
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        duration = frame_count / fps if fps > 0 else 0
+        cap.release()
+    else:
+        fps = 0
+        frame_count = 0
+        width = 0
+        height = 0
+        duration = 0
+    
+    return {
+        "filename": filename,
+        "size": stat.st_size,
+        "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+        "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        "video_info": {
+            "fps": fps,
+            "frame_count": frame_count,
+            "width": width,
+            "height": height,
+            "duration_seconds": duration
+        }
+    }
+
+@app.delete("/videos/{filename}")
+async def delete_video(filename: str):
+    """Delete a specific video file"""
+    if not os.path.exists(USB_MOUNT_PATH):
+        raise HTTPException(status_code=404, detail="USB drive not found")
+    
+    video_path = os.path.join(USB_MOUNT_PATH, filename)
+    
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found")
+    
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    try:
+        os.remove(video_path)
+        return {"success": True, "message": f"Video {filename} deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete video: {str(e)}")
 
 # --- Startup / Shutdown ---
 
