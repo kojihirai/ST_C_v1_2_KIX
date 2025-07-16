@@ -332,6 +332,75 @@ async def stream_video(filename: str):
         filename=filename
     )
 
+@app.get("/stream/{filename}")
+async def stream_video_with_ranges(filename: str, range: Optional[str] = None):
+    """Stream video with proper range support for browser video players"""
+    if not os.path.exists(USB_MOUNT_PATH):
+        raise HTTPException(status_code=404, detail="USB drive not found")
+    
+    video_path = os.path.join(USB_MOUNT_PATH, filename)
+    
+    if not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Video file not found")
+    
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    file_size = os.path.getsize(video_path)
+    
+    if range:
+        # Parse range header (e.g., "bytes=0-1023")
+        try:
+            range_header = range.replace("bytes=", "").split("-")
+            start = int(range_header[0]) if range_header[0] else 0
+            end = int(range_header[1]) if range_header[1] else file_size - 1
+            
+            if start >= file_size:
+                raise HTTPException(status_code=416, detail="Range not satisfiable")
+            
+            end = min(end, file_size - 1)
+            content_length = end - start + 1
+            
+            def video_stream():
+                with open(video_path, "rb") as f:
+                    f.seek(start)
+                    remaining = content_length
+                    chunk_size = 8192
+                    while remaining > 0:
+                        chunk = f.read(min(chunk_size, remaining))
+                        if not chunk:
+                            break
+                        yield chunk
+                        remaining -= len(chunk)
+            
+            return StreamingResponse(
+                video_stream(),
+                media_type="video/x-msvideo",
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length)
+                }
+            )
+        except (ValueError, IndexError):
+            raise HTTPException(status_code=400, detail="Invalid range header")
+    else:
+        # Full file response
+        def video_stream():
+            with open(video_path, "rb") as f:
+                while chunk := f.read(8192):
+                    yield chunk
+        
+        return StreamingResponse(
+            video_stream(),
+            media_type="video/x-msvideo",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size)
+            }
+        )
+
 @app.get("/videos/{filename}/info")
 async def get_video_info(filename: str):
     """Get information about a specific video file"""
