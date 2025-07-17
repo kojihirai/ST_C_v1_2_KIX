@@ -149,15 +149,15 @@ class Mode(Enum):
 
 class Direction(Enum):
     IDLE = 0
-    BW = 2   # Backward
-    FW = 1   # Forward
+    BW = 1   # Backward
+    FW = 2   # Forward
 
 
 BROKER_IP           = "192.168.2.1"
 DEVICE_ID           = "lcu"
 MOTOR_PINS          = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
 ENC_A, ENC_B        = 20, 21
-PULSES_PER_MM       = 667
+PULSES_PER_MM       = 333
 PWM_FREQ           = 20000
 SPEED_SAMPLE_INTERVAL_MS = 50
 MAX_SPEED_MMPS     = 9.144
