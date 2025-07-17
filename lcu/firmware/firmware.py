@@ -157,10 +157,10 @@ BROKER_IP           = "192.168.2.1"
 DEVICE_ID           = "lcu"
 MOTOR_PINS          = {"RPWM": 18, "LPWM": 19, "REN": 25, "LEN": 26}
 ENC_A, ENC_B        = 20, 21
-PULSES_PER_MM       = 110
+PULSES_PER_MM       = 667
 PWM_FREQ           = 20000
 SPEED_SAMPLE_INTERVAL_MS = 50
-MAX_SPEED_MMPS     = 9.144
+MAX_SPEED_MMPS     = 2
 SPEED_WINDOW       = 10
 INTEGRAL_MAX       = 5.0
 INTEGRAL_MIN       = -5.0
@@ -348,8 +348,7 @@ class MotorSystem:
             with self.state_lock:
                 mode, direction, tgt = self.mode, self.direction, self.target
 
-            # Debug: print current state every few seconds
-            if int(now) % 5 == 0:  # Print every 5 seconds
+            if int(now) % 5 == 0:
                 print(f"Run loop: mode={mode}, dir={direction}, tgt={tgt}")
 
             if mode == Mode.HOMING:
@@ -400,7 +399,7 @@ class MotorSystem:
             load_val  = 0.0
             try:
                 load_val = self.load_cell.read_parameter(0x00, length=2, signed=True) or 0.0
-                load_val = ((float(load_val)-LOAD_Y_OFFSET)/LOAD_X_OFFSET)
+                # load_val = ((float(load_val)-LOAD_Y_OFFSET)/LOAD_X_OFFSET)
             except Exception:
                 pass
 
